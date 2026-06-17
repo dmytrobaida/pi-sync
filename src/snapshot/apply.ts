@@ -67,7 +67,10 @@ async function preflightSnapshotMutations(
   }
 }
 
-function validateSnapshotPath(pathValue: string, seenPaths: Set<string>): string {
+function validateSnapshotPath(
+  pathValue: string,
+  seenPaths: Set<string>,
+): string {
   const normalized = toPosix(pathValue);
 
   if (
@@ -139,7 +142,10 @@ async function prepareSnapshotWrite(
   }
 }
 
-async function ensureSafeDirectory(root: string, directory: string): Promise<void> {
+async function ensureSafeDirectory(
+  root: string,
+  directory: string,
+): Promise<void> {
   const rootPath = path.resolve(root);
   const relative = path.relative(rootPath, path.resolve(directory));
   let current = rootPath;
@@ -157,7 +163,9 @@ async function ensureDirectorySegment(current: string): Promise<void> {
     const stat = await fs.lstat(current);
 
     if (stat.isSymbolicLink()) {
-      throw new Error(`Refusing to follow symlink during snapshot apply: ${current}`);
+      throw new Error(
+        `Refusing to follow symlink during snapshot apply: ${current}`,
+      );
     }
 
     if (!stat.isDirectory()) {
@@ -172,21 +180,29 @@ async function ensureDirectorySegment(current: string): Promise<void> {
   }
 }
 
-async function assertNoSymlinkParents(root: string, target: string): Promise<void> {
+async function assertNoSymlinkParents(
+  root: string,
+  target: string,
+): Promise<void> {
   const rootPath = path.resolve(root);
   const relative = path.relative(rootPath, path.resolve(target));
   let current = rootPath;
 
   safeJoin(root, relative);
 
-  for (const part of relative.split(path.sep).filter((item) => item !== "").slice(0, -1)) {
+  for (const part of relative
+    .split(path.sep)
+    .filter((item) => item !== "")
+    .slice(0, -1)) {
     current = path.join(current, part);
 
     try {
       const stat = await fs.lstat(current);
 
       if (stat.isSymbolicLink()) {
-        throw new Error(`Refusing to follow symlink during snapshot apply: ${current}`);
+        throw new Error(
+          `Refusing to follow symlink during snapshot apply: ${current}`,
+        );
       }
 
       if (!stat.isDirectory()) {

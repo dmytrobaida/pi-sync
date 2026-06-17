@@ -12,7 +12,10 @@ import { lockPath, stateDir } from "../utils/path-utils.js";
  * @param command Lock owner command label.
  * @param fn Operation to execute under the lock.
  */
-export async function withLock<T>(command: string, fn: () => Promise<T>): Promise<T> {
+export async function withLock<T>(
+  command: string,
+  fn: () => Promise<T>,
+): Promise<T> {
   await ensureStateDir();
   const lock: LockFile = {
     id: randomUUID(),

@@ -5,13 +5,23 @@ import path from "node:path";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
 import { loadConfig, loadPartialConfig } from "../config/config.js";
-import { DEFAULT_BRANCH, DEFAULT_PROFILE, NO_DIFF_MESSAGE, STATUS_KEY } from "../domain/constants.js";
+import {
+  DEFAULT_BRANCH,
+  DEFAULT_PROFILE,
+  NO_DIFF_MESSAGE,
+  STATUS_KEY,
+} from "../domain/constants.js";
 import type { CommandOptions } from "../domain/types.js";
 import { GitStore, syncPathspecs } from "../git/store.js";
 import { formatGitTextDiff } from "../snapshot/diff.js";
 import { createSnapshot, scanSnapshot } from "../snapshot/snapshot.js";
-import { ensureStateDir, isStaleLock, readLock, withLock } from "../state/lock.js";
-import { hasLocalChanges,remoteChangedSinceState } from "../state/state.js";
+import {
+  ensureStateDir,
+  isStaleLock,
+  readLock,
+  withLock,
+} from "../state/lock.js";
+import { hasLocalChanges, remoteChangedSinceState } from "../state/state.js";
 import { errorMessage, writeJson } from "../utils/json-utils.js";
 import { localConfigPath, repoDir, stateDir } from "../utils/path-utils.js";
 import { isEnabled, parseOptions, splitArgs, usage } from "./args.js";
@@ -103,7 +113,10 @@ async function runCommand(
 
       return;
     default:
-      ctx.ui.notify(`Unknown /pisync command: ${subcommand}\n\n${usage()}`, "warning");
+      ctx.ui.notify(
+        `Unknown /pisync command: ${subcommand}\n\n${usage()}`,
+        "warning",
+      );
   }
 }
 
@@ -125,7 +138,10 @@ async function initConfig(ctx: ExtensionCommandContext): Promise<void> {
     profile: DEFAULT_PROFILE,
     autoSync: true,
   });
-  ctx.ui.notify(`Created ${configPath}. Fill in the Git repository, then run /pisync doctor.`, "info");
+  ctx.ui.notify(
+    `Created ${configPath}. Fill in the Git repository, then run /pisync doctor.`,
+    "info",
+  );
 }
 
 async function showConfig(ctx: ExtensionCommandContext): Promise<void> {
@@ -156,7 +172,9 @@ async function status(ctx: ExtensionCommandContext): Promise<void> {
   ctx.ui.notify(
     [
       `profile: ${config.profile}`,
-      remote != null ? `remote: ${remote.id} at ${remoteCommit}` : "remote: empty",
+      remote != null
+        ? `remote: ${remote.id} at ${remoteCommit}`
+        : "remote: empty",
       `local files: ${local.files.length}`,
       `local changed since last sync: ${localChanged ? "yes" : "no"}`,
       `remote changed since last sync: ${remoteChanged ? "yes" : "no"}`,
@@ -181,7 +199,9 @@ async function doctor(ctx: ExtensionCommandContext): Promise<void> {
   try {
     const config = await loadConfig();
 
-    messages.push(`config: ok (${config.repository}#${config.branch}/repo-root)`);
+    messages.push(
+      `config: ok (${config.repository}#${config.branch}/repo-root)`,
+    );
     const gitStore = new GitStore(config);
 
     await gitStore.prepare();
@@ -211,10 +231,16 @@ async function history(ctx: ExtensionCommandContext): Promise<void> {
   ]);
   const historyText = output.trim();
 
-  ctx.ui.notify(historyText.length > 0 ? historyText : "No pi-sync history found.", "info");
+  ctx.ui.notify(
+    historyText.length > 0 ? historyText : "No pi-sync history found.",
+    "info",
+  );
 }
 
-async function unlock(ctx: ExtensionCommandContext, options: CommandOptions): Promise<void> {
+async function unlock(
+  ctx: ExtensionCommandContext,
+  options: CommandOptions,
+): Promise<void> {
   const lock = await readLock();
 
   if (lock == null) {

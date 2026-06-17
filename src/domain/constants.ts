@@ -15,7 +15,12 @@ export const TOP_LEVEL_FILES = new Set([
   "AGENTS.md",
 ]);
 
-export const TOP_LEVEL_DIRS = new Set(["skills", "prompts", "themes", "extensions"]);
+export const TOP_LEVEL_DIRS = new Set([
+  "skills",
+  "prompts",
+  "themes",
+  "extensions",
+]);
 
 export const SECRET_PATTERNS = [
   /AWS_SECRET_ACCESS_KEY\s*[=:]\s*['"]?[A-Za-z0-9/+]{35,}/i,

@@ -1,7 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import type { ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionCommandContext,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 
 import { loadConfig } from "../config/config.js";
 import { STATUS_KEY } from "../domain/constants.js";
@@ -9,10 +12,19 @@ import type { CommandOptions, Snapshot, SyncConfig } from "../domain/types.js";
 import { GitStore } from "../git/store.js";
 import { applySnapshot } from "../snapshot/apply.js";
 import { formatGitTextDiff } from "../snapshot/diff.js";
-import { createSnapshot, fileHashMap, scanSnapshot } from "../snapshot/snapshot.js";
-import { hasLocalChanges, remoteChangedSinceState, sameHashes, writeSyncState } from "../state/state.js";
+import {
+  createSnapshot,
+  fileHashMap,
+  scanSnapshot,
+} from "../snapshot/snapshot.js";
+import {
+  hasLocalChanges,
+  remoteChangedSinceState,
+  sameHashes,
+  writeSyncState,
+} from "../state/state.js";
 import { agentDir, stateDir } from "../utils/path-utils.js";
-import { type SyncInputs,syncInputs } from "./context.js";
+import { type SyncInputs, syncInputs } from "./context.js";
 
 /**
  * Coordinates push, pull, sync, and rollback flows for one command invocation.
@@ -38,16 +50,23 @@ export class SyncOperations {
     const secrets = scanSnapshot(local);
 
     if (secrets.length > 0) {
-      throw new Error(`Refusing to push possible secrets:\n${secrets.map((s) => `- ${s}`).join("\n")}`);
+      throw new Error(
+        `Refusing to push possible secrets:\n${secrets.map((s) => `- ${s}`).join("\n")}`,
+      );
     }
 
     if (remoteChangedSinceState(remote, state) && !this.options.force) {
-      throw new Error("Remote changed since last sync. Run /pisync pull first or /pisync push --force.");
+      throw new Error(
+        "Remote changed since last sync. Run /pisync pull first or /pisync push --force.",
+      );
     }
 
     const confirmed = this.options.yes
       ? true
-      : await this.ctx.ui.confirm("Push pi settings?", formatPushSummary(local, remote));
+      : await this.ctx.ui.confirm(
+          "Push pi settings?",
+          formatPushSummary(local, remote),
+        );
 
     if (!confirmed) {
       this.ctx.ui.setStatus(STATUS_KEY, undefined);
@@ -67,11 +86,15 @@ export class SyncOperations {
     const { config, local, remote, state } = await syncInputs();
 
     if (remote == null) {
-      throw new Error("Remote is empty. Run /pisync push from a configured machine first.");
+      throw new Error(
+        "Remote is empty. Run /pisync push from a configured machine first.",
+      );
     }
 
     if (hasDiverged(local, remote, state) && !this.options.force) {
-      throw new Error("Both local and remote changed since last sync. Run /pisync diff, then choose /pisync pull --force or /pisync push --force.");
+      throw new Error(
+        "Both local and remote changed since last sync. Run /pisync diff, then choose /pisync pull --force or /pisync push --force.",
+      );
     }
 
     const diffOutput = await formatGitTextDiff(local, remote);
@@ -106,7 +129,9 @@ export class SyncOperations {
     }
 
     if (localChanged && remoteChanged && state.lastAppliedSnapshot != null) {
-      throw new Error("Both local and remote changed. Run /pisync diff and resolve with push --force or pull --force.");
+      throw new Error(
+        "Both local and remote changed. Run /pisync diff and resolve with push --force or pull --force.",
+      );
     }
 
     if (remoteChanged) {
@@ -160,15 +185,25 @@ export class SyncOperations {
     await this.rollbackSnapshot(config, remote);
   }
 
-  private async applyRemoteSnapshot(config: SyncConfig, remote: Snapshot): Promise<void> {
+  private async applyRemoteSnapshot(
+    config: SyncConfig,
+    remote: Snapshot,
+  ): Promise<void> {
     const backup = await backupLocal(config.profile);
 
     await applySnapshot(remote);
-    await writeSyncState(config.profile, remote, await new GitStore(config).currentCommit());
+    await writeSyncState(
+      config.profile,
+      remote,
+      await new GitStore(config).currentCommit(),
+    );
     this.ctx.ui.setStatus(STATUS_KEY, undefined);
 
     if (!this.options.silent) {
-      this.ctx.ui.notify(`Pulled ${remote.files.length} files from ${remote.id}. Backup: ${backup}`, "info");
+      this.ctx.ui.notify(
+        `Pulled ${remote.files.length} files from ${remote.id}. Backup: ${backup}`,
+        "info",
+      );
     }
 
     if (this.options.reload) {
@@ -182,17 +217,29 @@ export class SyncOperations {
     remote: Snapshot,
   ): Promise<void> {
     if (!sameHashes(fileHashMap(local), fileHashMap(remote))) {
-      throw new Error("Remote settings exist and this machine has different local Pi settings. Run /pisync diff, then manually choose /pisync pull or /pisync push.");
+      throw new Error(
+        "Remote settings exist and this machine has different local Pi settings. Run /pisync diff, then manually choose /pisync pull or /pisync push.",
+      );
     }
 
-    await writeSyncState(config.profile, remote, await new GitStore(config).currentCommit());
+    await writeSyncState(
+      config.profile,
+      remote,
+      await new GitStore(config).currentCommit(),
+    );
 
     if (!this.options.silent) {
-      this.ctx.ui.notify("pi-sync state initialized; local settings already match remote.", "info");
+      this.ctx.ui.notify(
+        "pi-sync state initialized; local settings already match remote.",
+        "info",
+      );
     }
   }
 
-  private async pushSnapshot(config: SyncConfig, local: Snapshot): Promise<void> {
+  private async pushSnapshot(
+    config: SyncConfig,
+    local: Snapshot,
+  ): Promise<void> {
     const gitStore = new GitStore(config);
 
     await gitStore.writeSnapshot(local);
@@ -205,13 +252,18 @@ export class SyncOperations {
 
     if (!this.options.silent) {
       this.ctx.ui.notify(
-        committed ? `Pushed ${local.files.length} files as ${local.id}.` : "No Git changes to push.",
+        committed
+          ? `Pushed ${local.files.length} files as ${local.id}.`
+          : "No Git changes to push.",
         "info",
       );
     }
   }
 
-  private async rollbackSnapshot(config: SyncConfig, remote: Snapshot): Promise<void> {
+  private async rollbackSnapshot(
+    config: SyncConfig,
+    remote: Snapshot,
+  ): Promise<void> {
     const backup = await backupLocal(config.profile);
 
     await applySnapshot(remote);
@@ -219,8 +271,15 @@ export class SyncOperations {
 
     await gitStore.writeSnapshot(remote);
     await gitStore.commitAndPush(`pi-sync rollback: ${remote.id}`);
-    await writeSyncState(config.profile, remote, await gitStore.currentCommit());
-    this.ctx.ui.notify(`Rolled back to ${remote.id}. Backup: ${backup}`, "info");
+    await writeSyncState(
+      config.profile,
+      remote,
+      await gitStore.currentCommit(),
+    );
+    this.ctx.ui.notify(
+      `Rolled back to ${remote.id}. Backup: ${backup}`,
+      "info",
+    );
     await this.maybeReload();
   }
 
@@ -240,7 +299,11 @@ export class SyncOperations {
   }
 }
 
-function hasDiverged(local: Snapshot, remote: Snapshot, state: SyncInputs["state"]): boolean {
+function hasDiverged(
+  local: Snapshot,
+  remote: Snapshot,
+  state: SyncInputs["state"],
+): boolean {
   return (
     hasLocalChanges(local, state) &&
     remote.id !== state.lastAppliedSnapshot &&
@@ -260,7 +323,10 @@ async function backupLocal(profile: string): Promise<string> {
   return backupPath;
 }
 
-function formatPushSummary(local: Snapshot, remote: Snapshot | undefined): string {
+function formatPushSummary(
+  local: Snapshot,
+  remote: Snapshot | undefined,
+): string {
   return [
     `Upload ${local.files.length} files from ${agentDir()}.`,
     remote != null ? `Remote latest: ${remote.id}` : "Remote latest: empty",

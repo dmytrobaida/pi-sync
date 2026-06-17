@@ -4,11 +4,25 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { TOP_LEVEL_DIRS, TOP_LEVEL_FILES, VERSION } from "../domain/constants.js";
+import {
+  TOP_LEVEL_DIRS,
+  TOP_LEVEL_FILES,
+  VERSION,
+} from "../domain/constants.js";
 import type { Snapshot, SnapshotFile, SyncConfig } from "../domain/types.js";
-import { hashBuffer, hashFiles, isDeniedPath, materializeSnapshot } from "../snapshot/snapshot.js";
+import {
+  hashBuffer,
+  hashFiles,
+  isDeniedPath,
+  materializeSnapshot,
+} from "../snapshot/snapshot.js";
 import { firstNonEmpty } from "../utils/json-utils.js";
-import { repoDir, safeJoin, toPosix, trimSlashes } from "../utils/path-utils.js";
+import {
+  repoDir,
+  safeJoin,
+  toPosix,
+  trimSlashes,
+} from "../utils/path-utils.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -47,7 +61,12 @@ export class GitStore {
 
     if (remoteBranchExists) {
       await this.run(["fetch", "origin", this.config.branch]);
-      await this.run(["checkout", "-B", this.config.branch, `origin/${this.config.branch}`]);
+      await this.run([
+        "checkout",
+        "-B",
+        this.config.branch,
+        `origin/${this.config.branch}`,
+      ]);
       await this.run(["pull", "--ff-only", "origin", this.config.branch]);
 
       return;
@@ -146,7 +165,12 @@ export class GitStore {
   }
 
   private async remoteBranchExists(): Promise<boolean> {
-    const output = await this.run(["ls-remote", "--heads", "origin", this.config.branch]);
+    const output = await this.run([
+      "ls-remote",
+      "--heads",
+      "origin",
+      this.config.branch,
+    ]);
 
     return output.trim().length > 0;
   }
@@ -187,11 +211,15 @@ export class GitStore {
       return undefined;
     }
 
-    const { stdout } = await execFileAsync("git", ["show", `${commitish}:${repoPath}`], {
-      cwd: repoDir(this.config.profile),
-      encoding: "buffer",
-      maxBuffer: 50 * 1024 * 1024,
-    });
+    const { stdout } = await execFileAsync(
+      "git",
+      ["show", `${commitish}:${repoPath}`],
+      {
+        cwd: repoDir(this.config.profile),
+        encoding: "buffer",
+        maxBuffer: 50 * 1024 * 1024,
+      },
+    );
     const content = Buffer.from(stdout);
 
     return {
@@ -201,7 +229,10 @@ export class GitStore {
     };
   }
 
-  private async commitId(commitish: string, files: SnapshotFile[]): Promise<string> {
+  private async commitId(
+    commitish: string,
+    files: SnapshotFile[],
+  ): Promise<string> {
     try {
       return (await this.run(["rev-parse", "--short", commitish])).trim();
     } catch {
@@ -231,7 +262,10 @@ export class GitStore {
     const root = repoDir(this.config.profile);
 
     for (const relativePath of this.syncPathspecsWithLegacy()) {
-      await fs.rm(safeJoin(root, relativePath), { force: true, recursive: true });
+      await fs.rm(safeJoin(root, relativePath), {
+        force: true,
+        recursive: true,
+      });
     }
   }
 }

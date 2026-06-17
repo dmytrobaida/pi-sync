@@ -1,4 +1,8 @@
-import { DEFAULT_BRANCH, DEFAULT_PREFIX, DEFAULT_PROFILE } from "../domain/constants.js";
+import {
+  DEFAULT_BRANCH,
+  DEFAULT_PREFIX,
+  DEFAULT_PROFILE,
+} from "../domain/constants.js";
 import type { PartialConfig, SyncConfig } from "../domain/types.js";
 import { readJsonIfExists } from "../utils/json-utils.js";
 import { localConfigPath, trimSlashes } from "../utils/path-utils.js";
@@ -29,7 +33,8 @@ export async function loadConfig(): Promise<SyncConfig> {
  * Load config from local file and environment overrides.
  */
 export async function loadPartialConfig(): Promise<PartialConfig> {
-  const fileConfig = (await readJsonIfExists<PartialConfig>(localConfigPath())) ?? {};
+  const fileConfig =
+    (await readJsonIfExists<PartialConfig>(localConfigPath())) ?? {};
 
   return {
     ...fileConfig,

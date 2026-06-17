@@ -1,9 +1,16 @@
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 
 import { isEnabled } from "./commands/args.js";
 import { handleCommand } from "./commands/commands.js";
 import { SyncOperations } from "./commands/operations.js";
-import { isMissingConfigError, loadConfig, loadPartialConfig } from "./config/config.js";
+import {
+  isMissingConfigError,
+  loadConfig,
+  loadPartialConfig,
+} from "./config/config.js";
 import { AUTO_SYNC_OPTIONS, STATUS_KEY } from "./domain/constants.js";
 import { ensureStateDir, withLock } from "./state/lock.js";
 import { errorMessage } from "./utils/json-utils.js";
@@ -55,6 +62,9 @@ async function autoSync(ctx: ExtensionContext): Promise<void> {
     }
 
     ctx.ui.setStatus(STATUS_KEY, undefined);
-    ctx.ui.notify(`pi-sync auto sync skipped: ${errorMessage(error)}`, "warning");
+    ctx.ui.notify(
+      `pi-sync auto sync skipped: ${errorMessage(error)}`,
+      "warning",
+    );
   }
 }

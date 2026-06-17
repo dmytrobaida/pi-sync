@@ -367,18 +367,31 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@dbaida/eslint-config@npm:1.0.0":
+  version: 1.0.0
+  resolution: "@dbaida/eslint-config@npm:1.0.0"
+  dependencies:
+    "@eslint/js": "npm:^10.0.1"
+    eslint-plugin-jsdoc: "npm:63.0.2"
+    eslint-plugin-simple-import-sort: "npm:^13.0.0"
+    globals: "npm:^17.6.0"
+    typescript-eslint: "npm:^8.61.1"
+  peerDependencies:
+    eslint: ">=9 <11"
+    typescript: ">=5 <6"
+  checksum: 10c0/74dc9218ad5a5a309183eb35eef521951d46ed240012d3b4ef1478ef91e95bdc4f56ea2899136e5958cfaa7eed5bf0817e8d039ee02b146d3c89d125373338d5
+  languageName: node
+  linkType: hard
+
 "@dbaida/pi-sync@workspace:.":
   version: 0.0.0-use.local
   resolution: "@dbaida/pi-sync@workspace:."
   dependencies:
+    "@dbaida/eslint-config": "npm:1.0.0"
     "@earendil-works/pi-coding-agent": "npm:^0.74.0"
-    "@eslint/js": "npm:^10.0.1"
     eslint: "npm:^10.5.0"
-    eslint-plugin-jsdoc: "npm:^63.0.4"
-    eslint-plugin-simple-import-sort: "npm:^13.0.0"
-    globals: "npm:^17.6.0"
+    prettier: "npm:^3.8.4"
     typescript: "npm:^6.0.3"
-    typescript-eslint: "npm:^8.61.1"
   peerDependencies:
     "@earendil-works/pi-coding-agent": "*"
   languageName: unknown
@@ -1266,9 +1279,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint-plugin-jsdoc@npm:^63.0.4":
-  version: 63.0.4
-  resolution: "eslint-plugin-jsdoc@npm:63.0.4"
+"eslint-plugin-jsdoc@npm:63.0.2":
+  version: 63.0.2
+  resolution: "eslint-plugin-jsdoc@npm:63.0.2"
   dependencies:
     "@es-joy/jsdoccomment": "npm:~0.87.0"
     "@es-joy/resolve.exports": "npm:1.2.0"
@@ -1286,7 +1299,7 @@ __metadata:
     to-valid-identifier: "npm:^1.0.0"
   peerDependencies:
     eslint: ^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0
-  checksum: 10c0/6ae489aca732dd82d859744b83304b339fdb5373df18d79b892cbca16fcc896f42d2b27f1e19c4bbe6027582690e70ebcc8319f7e162763941f31cbc1bc05948
+  checksum: 10c0/66252ae3fcba03d3c1e438d8b653c873064e8e59b78f8984df64c645681db156db3899ecba058a473cdd158d7a56d8b5ededfddab1a5fc37942d92c1d33a41b6
   languageName: node
   linkType: hard
 
@@ -2024,6 +2037,15 @@ __metadata:
   version: 1.2.1
   resolution: "prelude-ls@npm:1.2.1"
   checksum: 10c0/b00d617431e7886c520a6f498a2e14c75ec58f6d93ba48c3b639cf241b54232d90daa05d83a9e9b9fef6baa63cb7e1e4602c2372fea5bc169668401eb127d0cd
+  languageName: node
+  linkType: hard
+
+"prettier@npm:^3.8.4":
+  version: 3.8.4
+  resolution: "prettier@npm:3.8.4"
+  bin:
+    prettier: bin/prettier.cjs
+  checksum: 10c0/b90a0cbe75b88ac0af9c13fe0f359bd19926fabccd88483227b21f71f0c1cc42da056fc1ac3a361e665577c568371d5ccfb2c62c31c8a1186f8d1bd531a063e9
   languageName: node
   linkType: hard
 

@@ -3,7 +3,12 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { SECRET_PATTERNS, TOP_LEVEL_DIRS, TOP_LEVEL_FILES, VERSION } from "../domain/constants.js";
+import {
+  SECRET_PATTERNS,
+  TOP_LEVEL_DIRS,
+  TOP_LEVEL_FILES,
+  VERSION,
+} from "../domain/constants.js";
 import type { Snapshot, SnapshotFile } from "../domain/types.js";
 import { agentDir, posixJoin, safeJoin, toPosix } from "../utils/path-utils.js";
 
@@ -62,7 +67,9 @@ export function scanSnapshot(snapshot: Snapshot): string[] {
       continue;
     }
 
-    if (SECRET_PATTERNS.some((pattern) => pattern.test(content.toString("utf8")))) {
+    if (
+      SECRET_PATTERNS.some((pattern) => pattern.test(content.toString("utf8")))
+    ) {
       findings.push(file.path);
     }
   }
@@ -153,7 +160,9 @@ async function collectDirectory(
 ): Promise<void> {
   const absoluteDirectory = path.join(root, relativeDirectory);
 
-  for (const entry of await fs.readdir(absoluteDirectory, { withFileTypes: true })) {
+  for (const entry of await fs.readdir(absoluteDirectory, {
+    withFileTypes: true,
+  })) {
     const relativePath = posixJoin(relativeDirectory, entry.name);
 
     if (isDeniedPath(relativePath)) {
@@ -186,7 +195,10 @@ async function addFile(
   });
 }
 
-async function materializeFile(root: string, file: SnapshotFile): Promise<void> {
+async function materializeFile(
+  root: string,
+  file: SnapshotFile,
+): Promise<void> {
   const target = safeJoin(root, file.path);
   const content = decodeBase64Strict(file.contentBase64, file.path);
 

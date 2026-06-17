@@ -6,7 +6,9 @@ import path from "node:path";
  *
  * @param filePath Path to read.
  */
-export async function readJsonIfExists<T>(filePath: string): Promise<T | undefined> {
+export async function readJsonIfExists<T>(
+  filePath: string,
+): Promise<T | undefined> {
   try {
     return JSON.parse(await fs.readFile(filePath, "utf8")) as T;
   } catch (error) {
@@ -24,7 +26,10 @@ export async function readJsonIfExists<T>(filePath: string): Promise<T | undefin
  * @param filePath Destination path.
  * @param value Value to serialize.
  */
-export async function writeJson(filePath: string, value: unknown): Promise<void> {
+export async function writeJson(
+  filePath: string,
+  value: unknown,
+): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, `${JSON.stringify(value, null, "\t")}\n`);
 }
