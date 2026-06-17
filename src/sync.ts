@@ -5,6 +5,7 @@ import type {
 
 import { isEnabled } from "./commands/args.js";
 import { handleCommand } from "./commands/commands.js";
+import { completePisyncArguments } from "./commands/completions.js";
 import { SyncOperations } from "./commands/operations.js";
 import {
   isMissingConfigError,
@@ -28,6 +29,7 @@ export { posixJoin, safeJoin, safeName } from "./utils/path-utils.js";
 export default function sync(pi: ExtensionAPI): void {
   pi.registerCommand("pisync", {
     description: "Sync Pi settings through a Git repository",
+    getArgumentCompletions: completePisyncArguments,
     handler: async (args, ctx) => {
       await handleCommand(args, ctx);
     },
@@ -54,7 +56,7 @@ async function autoSync(ctx: ExtensionContext): Promise<void> {
     await ensureStateDir();
     await loadConfig();
     await withLock("auto-sync", async () => {
-      await new SyncOperations(ctx, AUTO_SYNC_OPTIONS).syncBoth();
+      await new SyncOperations(ctx, AUTO_SYNC_OPTIONS).autoSync();
     });
   } catch (error) {
     if (isMissingConfigError(error)) {

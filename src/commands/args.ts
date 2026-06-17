@@ -35,7 +35,7 @@ export function parseOptions(args: string[]): CommandOptions {
 export function usage(): string {
   return [
     "Usage: /pisync <command>",
-    "Commands: init, config, status, diff, doctor, push, pull, sync, history, rollback <commit-ish>, unlock --stale",
+    "Commands: init, config, status, diff, doctor, push, pull, sync, history, checkout <commit-ish>, unlock --stale",
     "Config: set PI_SYNC_REPOSITORY plus optional PI_SYNC_BRANCH/profile, or edit ~/.pi/agent/pi-sync.local.json.",
   ].join("\n");
 }

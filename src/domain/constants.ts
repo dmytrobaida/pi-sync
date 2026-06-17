@@ -3,7 +3,6 @@ import type { CommandOptions } from "./types.js";
 export const STATUS_KEY = "pisync";
 export const VERSION = 1;
 export const DEFAULT_PROFILE = "default";
-export const DEFAULT_PREFIX = "pi-sync";
 export const DEFAULT_BRANCH = "main";
 export const LOCK_STALE_MS = 30 * 60 * 1000;
 export const NO_DIFF_MESSAGE = "No file differences.";

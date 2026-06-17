@@ -102,9 +102,9 @@ async function runCommand(
       await history(ctx);
 
       return;
-    case "rollback":
-      await withLock("rollback", async () => {
-        await new SyncOperations(ctx, options).rollback();
+    case "checkout":
+      await withLock("checkout", async () => {
+        await new SyncOperations(ctx, options).checkout();
       });
 
       return;

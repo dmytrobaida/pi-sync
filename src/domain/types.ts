@@ -2,7 +2,6 @@ export type SyncConfig = {
   repository: string;
   branch: string;
   profile: string;
-  prefix: string;
   autoSync: boolean | string;
 };
 
@@ -10,7 +9,6 @@ export type PartialConfig = {
   repository?: string;
   branch?: string;
   profile?: string;
-  prefix?: string;
   autoSync?: boolean | string;
 };
 

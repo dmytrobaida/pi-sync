@@ -17,12 +17,7 @@ import {
   materializeSnapshot,
 } from "../snapshot/snapshot.js";
 import { firstNonEmpty } from "../utils/json-utils.js";
-import {
-  repoDir,
-  safeJoin,
-  toPosix,
-  trimSlashes,
-} from "../utils/path-utils.js";
+import { repoDir, safeJoin, toPosix } from "../utils/path-utils.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -248,20 +243,10 @@ export class GitStore {
     }
   }
 
-  private syncPathspecsWithLegacy(): string[] {
-    const legacyPrefix = trimSlashes(this.config.prefix);
-
-    if (legacyPrefix === "") {
-      return syncPathspecs();
-    }
-
-    return [...syncPathspecs(), legacyPrefix];
-  }
-
   private async removeSyncedRepoPaths(): Promise<void> {
     const root = repoDir(this.config.profile);
 
-    for (const relativePath of this.syncPathspecsWithLegacy()) {
+    for (const relativePath of syncPathspecs()) {
       await fs.rm(safeJoin(root, relativePath), {
         force: true,
         recursive: true,

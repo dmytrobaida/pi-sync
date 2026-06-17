@@ -27,7 +27,7 @@ import { agentDir, stateDir } from "../utils/path-utils.js";
 import { type SyncInputs, syncInputs } from "./context.js";
 
 /**
- * Coordinates push, pull, sync, and rollback flows for one command invocation.
+ * Coordinates push, pull, sync, and checkout flows for one command invocation.
  */
 export class SyncOperations {
   /**
@@ -152,18 +152,64 @@ export class SyncOperations {
   }
 
   /**
-   * Apply a previous Git commit-ish locally and push it as a rollback commit.
+   * Pull remote changes during auto-sync, but never push local changes automatically.
    */
-  async rollback(): Promise<void> {
+  async autoSync(): Promise<void> {
+    const { config, local, remote, state } = await syncInputs();
+    const localChanged = hasLocalChanges(local, state);
+    const remoteChanged = remoteChangedSinceState(remote, state);
+    const firstSync = state.lastAppliedSnapshot == null;
+
+    if (firstSync && remote != null && local.files.length > 0) {
+      await this.initializeMatchingState(config, local, remote);
+
+      return;
+    }
+
+    if (localChanged && remoteChanged && state.lastAppliedSnapshot != null) {
+      throw new Error(
+        "Both local and remote changed. Run /pisync diff and resolve with push --force or pull --force.",
+      );
+    }
+
+    if (remoteChanged) {
+      await this.pull();
+
+      return;
+    }
+
+    if (localChanged) {
+      this.ctx.ui.notify(
+        "Local pi-sync changes detected. Auto-sync will not push them automatically; run /pisync push when ready.",
+        "warning",
+      );
+
+      return;
+    }
+
+    if (remote == null) {
+      this.ctx.ui.notify(
+        "pi-sync remote is empty. Auto-sync will not push automatically; run /pisync push to initialize it.",
+        "warning",
+      );
+    }
+  }
+
+  /**
+   * Check out a previous Git commit-ish into local Pi config without changing remote.
+   */
+  async checkout(): Promise<void> {
     const target = this.options.args[0];
 
     if (target === "") {
-      throw new Error("Usage: /pisync rollback <commit-ish> [--yes]");
+      throw new Error("Usage: /pisync checkout <commit-ish> [--yes]");
     }
 
     const config = await loadConfig();
     const local = await createSnapshot(config.profile);
     const gitStore = new GitStore(config);
+
+    await gitStore.prepare();
     const remote = await gitStore.readSnapshot(target);
 
     if (remote == null) {
@@ -174,15 +220,15 @@ export class SyncOperations {
 
     const confirmed = this.options.yes
       ? true
-      : await this.ctx.ui.confirm("Rollback pi settings?", diffOutput);
+      : await this.ctx.ui.confirm("Check out pi settings locally?", diffOutput);
 
     if (!confirmed) {
-      this.ctx.ui.notify("Rollback cancelled.", "info");
+      this.ctx.ui.notify("Checkout cancelled.", "info");
 
       return;
     }
 
-    await this.rollbackSnapshot(config, remote);
+    await this.checkoutSnapshot(config, remote);
   }
 
   private async applyRemoteSnapshot(
@@ -260,24 +306,16 @@ export class SyncOperations {
     }
   }
 
-  private async rollbackSnapshot(
+  private async checkoutSnapshot(
     config: SyncConfig,
     remote: Snapshot,
   ): Promise<void> {
     const backup = await backupLocal(config.profile);
 
     await applySnapshot(remote);
-    const gitStore = new GitStore(config);
-
-    await gitStore.writeSnapshot(remote);
-    await gitStore.commitAndPush(`pi-sync rollback: ${remote.id}`);
-    await writeSyncState(
-      config.profile,
-      remote,
-      await gitStore.currentCommit(),
-    );
+    this.ctx.ui.setStatus(STATUS_KEY, undefined);
     this.ctx.ui.notify(
-      `Rolled back to ${remote.id}. Backup: ${backup}`,
+      `Checked out ${remote.id} locally. Remote was not changed. Backup: ${backup}`,
       "info",
     );
     await this.maybeReload();

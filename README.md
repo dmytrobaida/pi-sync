@@ -54,9 +54,11 @@ Environment overrides are also supported: `PI_SYNC_REPOSITORY` (or `PI_SYNC_REPO
 /pisync pull
 /pisync sync
 /pisync history
-/pisync rollback <commit-ish>
+/pisync checkout <commit-ish>
 /pisync unlock --stale
 ```
+
+Press Tab after `/pisync ` to autocomplete subcommands with short descriptions.
 
 Useful flags:
 
@@ -84,6 +86,7 @@ It excludes `.env*`, `node_modules`, `.git`, `.pisync`, `pi-sync.local.json`, an
 ## Safety
 
 - Local state, clone cache, locks, and backups live under `~/.pi/agent/.pisync/`.
-- Pull and rollback create local backups before changing files.
-- Pull and rollback apply normal Git-tracked files while still preflighting paths and refusing symlink escapes.
-- Auto-sync is enabled by default but uses conservative conflict checks and will ask you to resolve divergent local/remote changes manually.
+- Pull and checkout create local backups before changing files.
+- Pull and checkout apply normal Git-tracked files while still preflighting paths and refusing symlink escapes.
+- Checkout restores a previous commit locally without changing the remote branch; use `/pisync push` afterwards only if you want to publish that checked-out state as a new commit.
+- Auto-sync is enabled by default but never pushes local changes automatically; it only pulls safe remote changes or asks you to resolve conflicts manually.
