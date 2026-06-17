@@ -1,16 +1,18 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+
 import type { ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
+
+import { loadConfig } from "../config/config.js";
+import { STATUS_KEY } from "../domain/constants.js";
+import type { CommandOptions, Snapshot, SyncConfig } from "../domain/types.js";
+import { GitStore } from "../git/store.js";
 import { applySnapshot } from "../snapshot/apply.js";
 import { formatGitTextDiff } from "../snapshot/diff.js";
-import { GitStore } from "../git/store.js";
-import { agentDir, stateDir } from "../utils/path-utils.js";
 import { createSnapshot, fileHashMap, scanSnapshot } from "../snapshot/snapshot.js";
-import { hasLocalChanges, sameHashes, remoteChangedSinceState, writeSyncState } from "../state/state.js";
-import { STATUS_KEY } from "../domain/constants.js";
-import { loadConfig } from "../config/config.js";
-import { syncInputs, type SyncInputs } from "./context.js";
-import type { CommandOptions, Snapshot, SyncConfig } from "../domain/types.js";
+import { hasLocalChanges, remoteChangedSinceState, sameHashes, writeSyncState } from "../state/state.js";
+import { agentDir, stateDir } from "../utils/path-utils.js";
+import { type SyncInputs,syncInputs } from "./context.js";
 
 /**
  * Coordinates push, pull, sync, and rollback flows for one command invocation.

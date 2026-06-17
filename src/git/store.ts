@@ -1,13 +1,14 @@
+import { execFile } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import path from "node:path";
+import { promisify } from "node:util";
+
 import { TOP_LEVEL_DIRS, TOP_LEVEL_FILES, VERSION } from "../domain/constants.js";
+import type { Snapshot, SnapshotFile, SyncConfig } from "../domain/types.js";
+import { hashBuffer, hashFiles, isDeniedPath, materializeSnapshot } from "../snapshot/snapshot.js";
 import { firstNonEmpty } from "../utils/json-utils.js";
 import { repoDir, safeJoin, toPosix, trimSlashes } from "../utils/path-utils.js";
-import { hashBuffer, hashFiles, isDeniedPath, materializeSnapshot } from "../snapshot/snapshot.js";
-import type { Snapshot, SnapshotFile, SyncConfig } from "../domain/types.js";
 
 const execFileAsync = promisify(execFile);
 

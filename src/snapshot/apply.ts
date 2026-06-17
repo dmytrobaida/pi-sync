@@ -1,8 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+
+import type { Snapshot } from "../domain/types.js";
 import { agentDir, safeJoin, toPosix } from "../utils/path-utils.js";
 import { createSnapshot, decodeBase64Strict, hashBuffer } from "./snapshot.js";
-import type { Snapshot } from "../domain/types.js";
 
 /**
  *

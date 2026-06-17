@@ -1,20 +1,22 @@
 import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { isEnabled, parseOptions, splitArgs, usage } from "./args.js";
+
 import { loadConfig, loadPartialConfig } from "../config/config.js";
 import { DEFAULT_BRANCH, DEFAULT_PROFILE, NO_DIFF_MESSAGE, STATUS_KEY } from "../domain/constants.js";
-import { formatGitTextDiff } from "../snapshot/diff.js";
-import { GitStore, syncPathspecs } from "../git/store.js";
-import { errorMessage, writeJson } from "../utils/json-utils.js";
-import { ensureStateDir, isStaleLock, readLock, withLock } from "../state/lock.js";
-import { localConfigPath, repoDir, stateDir } from "../utils/path-utils.js";
-import { createSnapshot, scanSnapshot } from "../snapshot/snapshot.js";
-import { remoteChangedSinceState, hasLocalChanges } from "../state/state.js";
-import { SyncOperations } from "./operations.js";
-import { syncInputs } from "./context.js";
 import type { CommandOptions } from "../domain/types.js";
+import { GitStore, syncPathspecs } from "../git/store.js";
+import { formatGitTextDiff } from "../snapshot/diff.js";
+import { createSnapshot, scanSnapshot } from "../snapshot/snapshot.js";
+import { ensureStateDir, isStaleLock, readLock, withLock } from "../state/lock.js";
+import { hasLocalChanges,remoteChangedSinceState } from "../state/state.js";
+import { errorMessage, writeJson } from "../utils/json-utils.js";
+import { localConfigPath, repoDir, stateDir } from "../utils/path-utils.js";
+import { isEnabled, parseOptions, splitArgs, usage } from "./args.js";
+import { syncInputs } from "./context.js";
+import { SyncOperations } from "./operations.js";
 
 /**
  * Parse and execute a /pisync command invocation.

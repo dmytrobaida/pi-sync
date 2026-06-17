@@ -2,9 +2,10 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+
 import { SECRET_PATTERNS, TOP_LEVEL_DIRS, TOP_LEVEL_FILES, VERSION } from "../domain/constants.js";
-import { agentDir, posixJoin, safeJoin, toPosix } from "../utils/path-utils.js";
 import type { Snapshot, SnapshotFile } from "../domain/types.js";
+import { agentDir, posixJoin, safeJoin, toPosix } from "../utils/path-utils.js";
 
 /**
  * Create a snapshot from the local Pi agent configuration.

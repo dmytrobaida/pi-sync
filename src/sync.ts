@@ -1,16 +1,17 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+
 import { isEnabled } from "./commands/args.js";
-import { AUTO_SYNC_OPTIONS, STATUS_KEY } from "./domain/constants.js";
 import { handleCommand } from "./commands/commands.js";
 import { SyncOperations } from "./commands/operations.js";
 import { isMissingConfigError, loadConfig, loadPartialConfig } from "./config/config.js";
-import { errorMessage } from "./utils/json-utils.js";
+import { AUTO_SYNC_OPTIONS, STATUS_KEY } from "./domain/constants.js";
 import { ensureStateDir, withLock } from "./state/lock.js";
+import { errorMessage } from "./utils/json-utils.js";
 
-export { preflightSnapshotApply } from "./snapshot/apply.js";
 export { isEnabled, parseOptions, splitArgs } from "./commands/args.js";
-export { posixJoin, safeJoin, safeName } from "./utils/path-utils.js";
+export { preflightSnapshotApply } from "./snapshot/apply.js";
 export { isDeniedPath, scanSnapshot } from "./snapshot/snapshot.js";
+export { posixJoin, safeJoin, safeName } from "./utils/path-utils.js";
 
 /**
  * Register the Git-backed Pi settings sync extension.

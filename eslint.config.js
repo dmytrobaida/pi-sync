@@ -1,5 +1,6 @@
 import js from "@eslint/js";
 import jsdoc from "eslint-plugin-jsdoc";
+import simpleImportSort from "eslint-plugin-simple-import-sort";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
@@ -18,6 +19,9 @@ export default tseslint.config(
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
+    },
+    plugins: {
+      "simple-import-sort": simpleImportSort,
     },
     rules: {
       "@typescript-eslint/consistent-type-assertions": [
@@ -92,6 +96,8 @@ export default tseslint.config(
         "warn",
         { max: 60, skipBlankLines: true, skipComments: true },
       ],
+      "simple-import-sort/exports": "error",
+      "simple-import-sort/imports": "error",
       "padding-line-between-statements": [
         "error",
         { blankLine: "always", prev: ["const", "let", "var"], next: "*" },

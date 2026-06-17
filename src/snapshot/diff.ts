@@ -3,9 +3,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+
 import { NO_DIFF_MESSAGE } from "../domain/constants.js";
-import { materializeSnapshot } from "./snapshot.js";
 import type { Snapshot } from "../domain/types.js";
+import { materializeSnapshot } from "./snapshot.js";
 
 const execFileAsync = promisify(execFile);
 

@@ -1,7 +1,7 @@
 import { DEFAULT_BRANCH, DEFAULT_PREFIX, DEFAULT_PROFILE } from "../domain/constants.js";
+import type { PartialConfig, SyncConfig } from "../domain/types.js";
 import { readJsonIfExists } from "../utils/json-utils.js";
 import { localConfigPath, trimSlashes } from "../utils/path-utils.js";
-import type { PartialConfig, SyncConfig } from "../domain/types.js";
 
 /**
  * Load and validate complete pi-sync configuration.

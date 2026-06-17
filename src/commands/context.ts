@@ -1,8 +1,8 @@
 import { loadConfig } from "../config/config.js";
+import type { Snapshot, SyncConfig, SyncState } from "../domain/types.js";
 import { GitStore } from "../git/store.js";
 import { createSnapshot } from "../snapshot/snapshot.js";
 import { readState } from "../state/state.js";
-import type { Snapshot, SyncConfig, SyncState } from "../domain/types.js";
 
 export type SyncInputs = {
   config: SyncConfig;

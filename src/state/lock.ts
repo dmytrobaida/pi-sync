@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
+
 import { LOCK_STALE_MS } from "../domain/constants.js";
+import type { LockFile } from "../domain/types.js";
 import { readJsonIfExists } from "../utils/json-utils.js";
 import { lockPath, stateDir } from "../utils/path-utils.js";
-import type { LockFile } from "../domain/types.js";
 
 /**
  * Run a sync operation while holding the local pi-sync lock.

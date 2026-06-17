@@ -375,6 +375,7 @@ __metadata:
     "@eslint/js": "npm:^10.0.1"
     eslint: "npm:^10.5.0"
     eslint-plugin-jsdoc: "npm:^63.0.4"
+    eslint-plugin-simple-import-sort: "npm:^13.0.0"
     globals: "npm:^17.6.0"
     typescript: "npm:^6.0.3"
     typescript-eslint: "npm:^8.61.1"
@@ -1286,6 +1287,15 @@ __metadata:
   peerDependencies:
     eslint: ^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0
   checksum: 10c0/6ae489aca732dd82d859744b83304b339fdb5373df18d79b892cbca16fcc896f42d2b27f1e19c4bbe6027582690e70ebcc8319f7e162763941f31cbc1bc05948
+  languageName: node
+  linkType: hard
+
+"eslint-plugin-simple-import-sort@npm:^13.0.0":
+  version: 13.0.0
+  resolution: "eslint-plugin-simple-import-sort@npm:13.0.0"
+  peerDependencies:
+    eslint: ">=5.0.0"
+  checksum: 10c0/f561f3483c1c18dfa2705326d38d62c62d4aeb5947ed6d1f028299c5dc668586b5ef144926e68fe187b3a937ee0159738dcbca8c286fe56f489de52fd8f9e678
   languageName: node
   linkType: hard
 

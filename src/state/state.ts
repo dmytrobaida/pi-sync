@@ -1,8 +1,8 @@
 import { VERSION } from "../domain/constants.js";
+import type { Snapshot, SyncState } from "../domain/types.js";
+import { fileHashMap } from "../snapshot/snapshot.js";
 import { readJsonIfExists, writeJson } from "../utils/json-utils.js";
 import { statePath } from "../utils/path-utils.js";
-import { fileHashMap } from "../snapshot/snapshot.js";
-import type { Snapshot, SyncState } from "../domain/types.js";
 
 /**
  * Read persisted local sync state for a profile.
