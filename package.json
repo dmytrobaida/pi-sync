@@ -1,0 +1,42 @@
+{
+	"name": "@dbaida/pi-sync",
+	"version": "0.1.0",
+	"description": "Pi extension that syncs Pi configuration through a Git repository.",
+	"type": "module",
+	"packageManager": "yarn@4.16.0",
+	"license": "MIT",
+	"keywords": [
+		"pi-package",
+		"pi-extension",
+		"pi",
+		"sync",
+		"git"
+	],
+	"files": [
+		"src",
+		"README.md",
+		"LICENSE"
+	],
+	"pi": {
+		"extensions": [
+			"./src/sync.ts"
+		]
+	},
+	"scripts": {
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"typecheck": "tsc --noEmit"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*"
+	},
+	"devDependencies": {
+		"@earendil-works/pi-coding-agent": "^0.74.0",
+		"@eslint/js": "^10.0.1",
+		"eslint": "^10.5.0",
+		"eslint-plugin-jsdoc": "^63.0.4",
+		"globals": "^17.6.0",
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.61.1"
+	}
+}
