@@ -66,6 +66,34 @@ export function remoteChangedSinceState(
 }
 
 /**
+ * List paths whose hashes differ between two snapshots or state maps.
+ *
+ * @param left First hash map.
+ * @param right Second hash map.
+ */
+export function changedPaths(
+  left: Record<string, string>,
+  right: Record<string, string>,
+): string[] {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+
+  return [...keys].filter((key) => left[key] !== right[key]).sort();
+}
+
+/**
+ * Count paths whose hashes differ between two snapshots or state maps.
+ *
+ * @param left First hash map.
+ * @param right Second hash map.
+ */
+export function changedPathCount(
+  left: Record<string, string>,
+  right: Record<string, string>,
+): number {
+  return changedPaths(left, right).length;
+}
+
+/**
  * Compare two path-to-hash maps for exact equality.
  *
  * @param left First hash map.
@@ -75,13 +103,5 @@ export function sameHashes(
   left: Record<string, string>,
   right: Record<string, string>,
 ): boolean {
-  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
-
-  for (const key of keys) {
-    if (left[key] !== right[key]) {
-      return false;
-    }
-  }
-
-  return true;
+  return changedPathCount(left, right) === 0;
 }

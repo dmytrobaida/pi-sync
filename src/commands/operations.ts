@@ -7,7 +7,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 
 import { loadConfig } from "../config/config.js";
-import { STATUS_KEY } from "../domain/constants.js";
+import { ACTIVITY_STATUS_KEY } from "../domain/constants.js";
 import type { CommandOptions, Snapshot, SyncConfig } from "../domain/types.js";
 import { GitStore } from "../git/store.js";
 import { applySnapshot } from "../snapshot/apply.js";
@@ -25,6 +25,15 @@ import {
 } from "../state/state.js";
 import { agentDir, stateDir } from "../utils/path-utils.js";
 import { type SyncInputs, syncInputs } from "./context.js";
+import {
+  refreshSyncFooter,
+  setSyncFooter,
+  syncDrift,
+} from "./footer-status.js";
+
+type SyncOperationSettings = {
+  notifyAutoSyncWarnings: boolean;
+};
 
 /**
  * Coordinates push, pull, sync, and checkout flows for one command invocation.
@@ -35,18 +44,24 @@ export class SyncOperations {
    *
    * @param ctx Pi context used for UI and optional reloads.
    * @param options Parsed command options.
+   * @param settings Runtime behavior toggles for operation notifications.
    */
   constructor(
     private readonly ctx: ExtensionCommandContext | ExtensionContext,
     private readonly options: CommandOptions,
+    private readonly settings: SyncOperationSettings = {
+      notifyAutoSyncWarnings: true,
+    },
   ) {}
 
   /**
    * Push local Pi config into the Git repository.
    */
   async push(): Promise<void> {
-    this.ctx.ui.setStatus(STATUS_KEY, "🔄 pushing");
+    this.ctx.ui.setStatus(ACTIVITY_STATUS_KEY, "🔄 pushing");
     const { config, local, remote, state } = await syncInputs();
+
+    setSyncFooter(this.ctx, local, remote, state);
     const secrets = scanSnapshot(local);
 
     if (secrets.length > 0) {
@@ -57,7 +72,12 @@ export class SyncOperations {
 
     if (remoteChangedSinceState(remote, state) && !this.options.force) {
       throw new Error(
-        "Remote changed since last sync. Run /pisync pull first or /pisync push --force.",
+        formatConflictGuidance(
+          local,
+          remote,
+          state,
+          "Remote changed since last sync. Run /pisync pull first or /pisync push --force.",
+        ),
       );
     }
 
@@ -69,7 +89,8 @@ export class SyncOperations {
         );
 
     if (!confirmed) {
-      this.ctx.ui.setStatus(STATUS_KEY, undefined);
+      setSyncFooter(this.ctx, local, remote, state);
+      this.ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
       this.ctx.ui.notify("Push cancelled.", "info");
 
       return;
@@ -82,8 +103,10 @@ export class SyncOperations {
    * Pull remote Git config into the local Pi config directory.
    */
   async pull(): Promise<void> {
-    this.ctx.ui.setStatus(STATUS_KEY, "🔄 pulling");
+    this.ctx.ui.setStatus(ACTIVITY_STATUS_KEY, "🔄 pulling");
     const { config, local, remote, state } = await syncInputs();
+
+    setSyncFooter(this.ctx, local, remote, state);
 
     if (remote == null) {
       throw new Error(
@@ -93,7 +116,12 @@ export class SyncOperations {
 
     if (hasDiverged(local, remote, state) && !this.options.force) {
       throw new Error(
-        "Both local and remote changed since last sync. Run /pisync diff, then choose /pisync pull --force or /pisync push --force.",
+        formatConflictGuidance(
+          local,
+          remote,
+          state,
+          "Both local and remote changed since last sync. Run /pisync diff, then choose /pisync pull --force or /pisync push --force.",
+        ),
       );
     }
 
@@ -104,7 +132,8 @@ export class SyncOperations {
       : await this.ctx.ui.confirm("Pull pi settings?", diffOutput);
 
     if (!confirmed) {
-      this.ctx.ui.setStatus(STATUS_KEY, undefined);
+      setSyncFooter(this.ctx, local, remote, state);
+      this.ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
       this.ctx.ui.notify("Pull cancelled.", "info");
 
       return;
@@ -118,6 +147,8 @@ export class SyncOperations {
    */
   async syncBoth(): Promise<void> {
     const { config, local, remote, state } = await syncInputs();
+
+    setSyncFooter(this.ctx, local, remote, state);
     const localChanged = hasLocalChanges(local, state);
     const remoteChanged = remoteChangedSinceState(remote, state);
     const firstSync = state.lastAppliedSnapshot == null;
@@ -130,7 +161,12 @@ export class SyncOperations {
 
     if (localChanged && remoteChanged && state.lastAppliedSnapshot != null) {
       throw new Error(
-        "Both local and remote changed. Run /pisync diff and resolve with push --force or pull --force.",
+        formatConflictGuidance(
+          local,
+          remote,
+          state,
+          "Both local and remote changed. Run /pisync diff and resolve with push --force or pull --force.",
+        ),
       );
     }
 
@@ -156,6 +192,8 @@ export class SyncOperations {
    */
   async autoSync(): Promise<void> {
     const { config, local, remote, state } = await syncInputs();
+
+    setSyncFooter(this.ctx, local, remote, state);
     const localChanged = hasLocalChanges(local, state);
     const remoteChanged = remoteChangedSinceState(remote, state);
     const firstSync = state.lastAppliedSnapshot == null;
@@ -168,7 +206,12 @@ export class SyncOperations {
 
     if (localChanged && remoteChanged && state.lastAppliedSnapshot != null) {
       throw new Error(
-        "Both local and remote changed. Run /pisync diff and resolve with push --force or pull --force.",
+        formatConflictGuidance(
+          local,
+          remote,
+          state,
+          "Both local and remote changed. Run /pisync diff and resolve with push --force or pull --force.",
+        ),
       );
     }
 
@@ -179,15 +222,17 @@ export class SyncOperations {
     }
 
     if (localChanged) {
-      this.ctx.ui.notify(
-        "Local pi-sync changes detected. Auto-sync will not push them automatically; run /pisync push when ready.",
-        "warning",
-      );
+      if (this.settings.notifyAutoSyncWarnings) {
+        this.ctx.ui.notify(
+          "Local pi-sync changes detected. Auto-sync will not push them automatically; run /pisync push when ready.",
+          "warning",
+        );
+      }
 
       return;
     }
 
-    if (remote == null) {
+    if (remote == null && this.settings.notifyAutoSyncWarnings) {
       this.ctx.ui.notify(
         "pi-sync remote is empty. Auto-sync will not push automatically; run /pisync push to initialize it.",
         "warning",
@@ -223,6 +268,8 @@ export class SyncOperations {
       : await this.ctx.ui.confirm("Check out pi settings locally?", diffOutput);
 
     if (!confirmed) {
+      await refreshSyncFooter(this.ctx);
+      this.ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
       this.ctx.ui.notify("Checkout cancelled.", "info");
 
       return;
@@ -243,7 +290,8 @@ export class SyncOperations {
       remote,
       await new GitStore(config).currentCommit(),
     );
-    this.ctx.ui.setStatus(STATUS_KEY, undefined);
+    await refreshSyncFooter(this.ctx);
+    this.ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
 
     if (!this.options.silent) {
       this.ctx.ui.notify(
@@ -273,6 +321,8 @@ export class SyncOperations {
       remote,
       await new GitStore(config).currentCommit(),
     );
+    await refreshSyncFooter(this.ctx);
+    this.ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
 
     if (!this.options.silent) {
       this.ctx.ui.notify(
@@ -294,7 +344,8 @@ export class SyncOperations {
     const after = await gitStore.currentCommit();
 
     await writeSyncState(config.profile, local, after !== "" ? after : before);
-    this.ctx.ui.setStatus(STATUS_KEY, undefined);
+    await refreshSyncFooter(this.ctx);
+    this.ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
 
     if (!this.options.silent) {
       this.ctx.ui.notify(
@@ -313,9 +364,10 @@ export class SyncOperations {
     const backup = await backupLocal(config.profile);
 
     await applySnapshot(remote);
-    this.ctx.ui.setStatus(STATUS_KEY, undefined);
+    await refreshSyncFooter(this.ctx);
+    this.ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
     this.ctx.ui.notify(
-      `Checked out ${remote.id} locally. Remote was not changed. Backup: ${backup}`,
+      `Checked out ${remote.id} locally. Remote was not changed. Backup: ${backup}\nLocal files now differ from latest remote; auto-sync will not push them. Run /pisync pull to return to remote latest, or /pisync push to publish this state.`,
       "info",
     );
     await this.maybeReload();
@@ -335,6 +387,17 @@ export class SyncOperations {
       await this.ctx.reload();
     }
   }
+}
+
+function formatConflictGuidance(
+  local: Snapshot,
+  remote: Snapshot | undefined,
+  state: SyncInputs["state"],
+  message: string,
+): string {
+  const drift = syncDrift(local, remote, state);
+
+  return `${message}\nStatus: PI-SYNC: ↑${drift.local} ↓${drift.remote}`;
 }
 
 function hasDiverged(

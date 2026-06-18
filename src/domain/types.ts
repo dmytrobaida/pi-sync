@@ -47,6 +47,7 @@ export type CommandOptions = {
   force: boolean;
   stale: boolean;
   silent: boolean;
+  verbose: boolean;
   reload: boolean;
   args: string[];
 };

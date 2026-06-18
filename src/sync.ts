@@ -6,13 +6,18 @@ import type {
 import { isEnabled } from "./commands/args.js";
 import { handleCommand } from "./commands/commands.js";
 import { completePisyncArguments } from "./commands/completions.js";
+import { refreshSyncFooter } from "./commands/footer-status.js";
 import { SyncOperations } from "./commands/operations.js";
 import {
   isMissingConfigError,
   loadConfig,
   loadPartialConfig,
 } from "./config/config.js";
-import { AUTO_SYNC_OPTIONS, STATUS_KEY } from "./domain/constants.js";
+import {
+  ACTIVITY_STATUS_KEY,
+  AUTO_SYNC_OPTIONS,
+  STATUS_KEY,
+} from "./domain/constants.js";
 import { ensureStateDir, withLock } from "./state/lock.js";
 import { errorMessage } from "./utils/json-utils.js";
 
@@ -27,6 +32,8 @@ export { posixJoin, safeJoin, safeName } from "./utils/path-utils.js";
  * @param pi Pi extension API used to register commands and lifecycle hooks.
  */
 export default function sync(pi: ExtensionAPI): void {
+  const warningState = { autoSyncWarningShown: false };
+
   pi.registerCommand("pisync", {
     description: "Sync Pi settings through a Git repository",
     getArgumentCompletions: completePisyncArguments,
@@ -35,34 +42,57 @@ export default function sync(pi: ExtensionAPI): void {
     },
   });
 
-  pi.on("session_start", async (_event, ctx) => {
-    ctx.ui.setStatus(STATUS_KEY, undefined);
-    await autoSync(ctx);
+  pi.on("session_start", (_event, ctx) => {
+    ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
+    ctx.ui.setStatus(STATUS_KEY, ctx.ui.theme.fg("muted", "PI-SYNC: loading"));
+    startAutoSyncInBackground(ctx, warningState);
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
+    ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
     ctx.ui.setStatus(STATUS_KEY, undefined);
   });
 }
 
-async function autoSync(ctx: ExtensionContext): Promise<void> {
+function startAutoSyncInBackground(
+  ctx: ExtensionContext,
+  warningState: { autoSyncWarningShown: boolean },
+): void {
+  setTimeout(() => {
+    void autoSync(ctx, warningState);
+  }, 0);
+}
+
+async function autoSync(
+  ctx: ExtensionContext,
+  warningState: { autoSyncWarningShown: boolean },
+): Promise<void> {
   try {
     const partial = await loadPartialConfig();
 
-    if (!isEnabled(partial.autoSync ?? process.env.PI_SYNC_AUTO_SYNC, true)) {
-      return;
-    }
-
     await ensureStateDir();
     await loadConfig();
-    await withLock("auto-sync", async () => {
-      await new SyncOperations(ctx, AUTO_SYNC_OPTIONS).autoSync();
-    });
-  } catch (error) {
-    if (isMissingConfigError(error)) {
+
+    if (!isEnabled(partial.autoSync ?? process.env.PI_SYNC_AUTO_SYNC, true)) {
+      await refreshSyncFooter(ctx);
+
       return;
     }
 
+    await withLock("auto-sync", async () => {
+      await new SyncOperations(ctx, AUTO_SYNC_OPTIONS, {
+        notifyAutoSyncWarnings: !warningState.autoSyncWarningShown,
+      }).autoSync();
+    });
+    warningState.autoSyncWarningShown = true;
+  } catch (error) {
+    if (isMissingConfigError(error)) {
+      ctx.ui.setStatus(STATUS_KEY, undefined);
+
+      return;
+    }
+
+    ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
     ctx.ui.setStatus(STATUS_KEY, undefined);
     ctx.ui.notify(
       `pi-sync auto sync skipped: ${errorMessage(error)}`,

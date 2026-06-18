@@ -6,26 +6,35 @@ import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
 import { loadConfig, loadPartialConfig } from "../config/config.js";
 import {
+  ACTIVITY_STATUS_KEY,
   DEFAULT_BRANCH,
   DEFAULT_PROFILE,
   NO_DIFF_MESSAGE,
-  STATUS_KEY,
 } from "../domain/constants.js";
-import type { CommandOptions } from "../domain/types.js";
+import type { CommandOptions, Snapshot, SyncState } from "../domain/types.js";
 import { GitStore, syncPathspecs } from "../git/store.js";
 import { formatGitTextDiff } from "../snapshot/diff.js";
-import { createSnapshot, scanSnapshot } from "../snapshot/snapshot.js";
+import {
+  createSnapshot,
+  fileHashMap,
+  scanSnapshot,
+} from "../snapshot/snapshot.js";
 import {
   ensureStateDir,
   isStaleLock,
   readLock,
   withLock,
 } from "../state/lock.js";
-import { hasLocalChanges, remoteChangedSinceState } from "../state/state.js";
+import {
+  changedPaths,
+  hasLocalChanges,
+  remoteChangedSinceState,
+} from "../state/state.js";
 import { errorMessage, writeJson } from "../utils/json-utils.js";
 import { localConfigPath, repoDir, stateDir } from "../utils/path-utils.js";
 import { isEnabled, parseOptions, splitArgs, usage } from "./args.js";
 import { syncInputs } from "./context.js";
+import { setSyncFooter, syncDrift } from "./footer-status.js";
 import { SyncOperations } from "./operations.js";
 
 /**
@@ -45,7 +54,7 @@ export async function handleCommand(
     await ensureStateDir();
     await runCommand(subcommand, options, ctx);
   } catch (error) {
-    ctx.ui.setStatus(STATUS_KEY, undefined);
+    ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
     ctx.ui.notify(errorMessage(error), "error");
   }
 }
@@ -69,7 +78,7 @@ async function runCommand(
 
       return;
     case "status":
-      await status(ctx);
+      await status(ctx, options);
 
       return;
     case "diff":
@@ -161,34 +170,91 @@ async function showConfig(ctx: ExtensionCommandContext): Promise<void> {
   );
 }
 
-async function status(ctx: ExtensionCommandContext): Promise<void> {
-  ctx.ui.setStatus(STATUS_KEY, "🔄 checking");
+async function status(
+  ctx: ExtensionCommandContext,
+  options: CommandOptions,
+): Promise<void> {
+  ctx.ui.setStatus(ACTIVITY_STATUS_KEY, "🔄 checking");
   const { config, local, remote, state } = await syncInputs();
+
+  setSyncFooter(ctx, local, remote, state);
   const localChanged = hasLocalChanges(local, state);
   const remoteChanged = remoteChangedSinceState(remote, state);
   const remoteCommit = await new GitStore(config).currentCommit();
+  const drift = syncDrift(local, remote, state);
+  const messages = [
+    `profile: ${config.profile}`,
+    remote != null
+      ? `remote: ${remote.id} at ${remoteCommit}`
+      : "remote: empty",
+    `local files: ${local.files.length}`,
+    `local changed since last sync: ${localChanged ? "yes" : "no"} (${drift.local} paths)`,
+    `remote changed since last sync: ${remoteChanged ? "yes" : "no"} (${drift.remote} paths)`,
+    nextAction(localChanged, remoteChanged),
+  ];
 
-  ctx.ui.setStatus(STATUS_KEY, undefined);
+  if (options.verbose) {
+    messages.push(...verboseStatusLines(local, remote, state));
+  }
+
+  ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
   ctx.ui.notify(
-    [
-      `profile: ${config.profile}`,
-      remote != null
-        ? `remote: ${remote.id} at ${remoteCommit}`
-        : "remote: empty",
-      `local files: ${local.files.length}`,
-      `local changed since last sync: ${localChanged ? "yes" : "no"}`,
-      `remote changed since last sync: ${remoteChanged ? "yes" : "no"}`,
-    ].join("\n"),
+    messages.join("\n"),
     localChanged || remoteChanged ? "warning" : "info",
   );
 }
 
+function nextAction(localChanged: boolean, remoteChanged: boolean): string {
+  if (localChanged && remoteChanged) {
+    return "next: run /pisync diff, then resolve with /pisync pull --force or /pisync push --force";
+  }
+
+  if (remoteChanged) {
+    return "next: run /pisync pull";
+  }
+
+  if (localChanged) {
+    return "next: run /pisync push when ready";
+  }
+
+  return "next: no action needed";
+}
+
+function verboseStatusLines(
+  local: Snapshot,
+  remote: Snapshot | undefined,
+  state: SyncState,
+): string[] {
+  const localPaths = changedPaths(fileHashMap(local), state.lastFileHashes);
+  const remotePaths = changedPaths(
+    remote != null ? fileHashMap(remote) : {},
+    state.lastFileHashes,
+  );
+
+  return [
+    "local changed paths:",
+    ...formatPathList(localPaths),
+    "remote changed paths:",
+    ...formatPathList(remotePaths),
+  ];
+}
+
+function formatPathList(paths: string[]): string[] {
+  if (paths.length === 0) {
+    return ["- none"];
+  }
+
+  return paths.map((item) => `- ${item}`);
+}
+
 async function diff(ctx: ExtensionCommandContext): Promise<void> {
-  ctx.ui.setStatus(STATUS_KEY, "🔄 diff");
-  const { local, remote } = await syncInputs();
+  ctx.ui.setStatus(ACTIVITY_STATUS_KEY, "🔄 diff");
+  const { local, remote, state } = await syncInputs();
+
+  setSyncFooter(ctx, local, remote, state);
   const output = await formatGitTextDiff(local, remote);
 
-  ctx.ui.setStatus(STATUS_KEY, undefined);
+  ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
   ctx.ui.notify(output, output === NO_DIFF_MESSAGE ? "info" : "warning");
 }
 

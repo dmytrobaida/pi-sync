@@ -1,6 +1,7 @@
 import type { CommandOptions } from "./types.js";
 
 export const STATUS_KEY = "pisync";
+export const ACTIVITY_STATUS_KEY = "pisync-activity";
 export const VERSION = 1;
 export const DEFAULT_PROFILE = "default";
 export const DEFAULT_BRANCH = "main";
@@ -34,6 +35,7 @@ export const AUTO_SYNC_OPTIONS: CommandOptions = {
   force: false,
   stale: false,
   silent: true,
+  verbose: false,
   reload: false,
   args: [],
 };

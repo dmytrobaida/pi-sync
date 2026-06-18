@@ -28,7 +28,7 @@ const SUBCOMMAND_COMPLETIONS: SubcommandCompletion[] = [
   },
   {
     value: "status",
-    label: "status",
+    label: "status [--verbose]",
     description:
       "Compare local files, remote Git state, and last synced state.",
     keywords: ["state", "changes"],

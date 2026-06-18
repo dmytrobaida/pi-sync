@@ -48,7 +48,7 @@ Environment overrides are also supported: `PI_SYNC_REPOSITORY` (or `PI_SYNC_REPO
 ```text
 /pisync config
 /pisync doctor
-/pisync status
+/pisync status [--verbose]
 /pisync diff
 /pisync push
 /pisync pull
@@ -57,6 +57,8 @@ Environment overrides are also supported: `PI_SYNC_REPOSITORY` (or `PI_SYNC_REPO
 /pisync checkout <commit-ish>
 /pisync unlock --stale
 ```
+
+The footer shows sync drift as `PI-SYNC: ↑<local> ↓<remote>`, where the red up arrow is local output changes since the last synced state and the green down arrow is remote input changes since that state.
 
 Press Tab after `/pisync ` to autocomplete subcommands with short descriptions.
 
