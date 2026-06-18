@@ -1,22 +1,96 @@
-# pi-sync — Git-backed Pi settings sync
+# pi-sync — Sync Pi settings through Git
 
-`@dbaida/pi-sync` is a Pi coding-agent extension based on the original `@narumitw/pi-sync` command set, but it stores Pi configuration as normal Git-tracked files instead of R2/S3 gzip snapshots.
+`@dbaida/pi-sync` syncs your Pi agent settings across machines using a Git repository.
 
-## Install / try locally
+Use it when you want the same Pi skills, prompts, themes, extensions, keybindings, models, and global instructions on multiple machines without copying files manually. Your configuration is stored as normal Git-tracked files, so you can inspect changes, review history, and restore earlier versions with familiar Git workflows.
 
-From this repository root:
+## When to use this
+
+Use pi-sync when you want to:
+
+- set up a new machine with your existing Pi configuration
+- keep prompts, skills, themes, extensions, and global instructions consistent across machines
+- back up Pi agent config in a private Git repo
+- review Pi configuration changes through Git history and diffs
+- restore an older config version locally without changing the remote repo
+
+## Prerequisites
+
+- Pi coding agent installed.
+- `git` installed and available in your shell.
+- A **private** Git repository for synced Pi configuration.
+- For GitHub HTTPS repositories, GitHub CLI (`gh`) is recommended so Git can reuse your existing GitHub login.
+
+Install GitHub CLI if needed:
 
 ```bash
-pi -e .
+brew install gh
 ```
 
-Or install as a Pi package once published/available:
+Then authenticate and configure Git HTTPS credentials:
+
+```bash
+gh auth login
+gh auth setup-git
+```
+
+SSH repository URLs are also supported, but they require normal SSH key and `ssh-agent` setup.
+
+## Install
+
+Install as a Pi package:
 
 ```bash
 pi install npm:@dbaida/pi-sync
 ```
 
-## Configure
+For local development from this repository root:
+
+```bash
+pi -e .
+```
+
+## Quick start
+
+1. Create a private Git repository for your Pi config.
+2. Install the extension:
+
+   ```bash
+   pi install npm:@dbaida/pi-sync
+   ```
+
+3. In Pi, run:
+
+   ```text
+   /pisync init
+   ```
+
+4. Enter your repository URL. HTTPS GitHub URLs are recommended if you already use `gh auth login`.
+5. Verify setup:
+
+   ```text
+   /pisync doctor
+   ```
+
+6. On your first machine, publish current config:
+
+   ```text
+   /pisync push
+   ```
+
+7. On another machine, use the same repository and run:
+
+   ```text
+   /pisync pull
+   ```
+
+When everything matches, the footer should show:
+
+```text
+PI-SYNC: ↑0 ↓0
+```
+
+## Configuration
 
 Run inside Pi:
 
@@ -61,15 +135,49 @@ Environment overrides are also supported: `PI_SYNC_REPOSITORY` (or `PI_SYNC_REPO
 /pisync unlock --stale
 ```
 
-The footer shows sync drift as `PI-SYNC: ↑<local> ↓<remote>`, where the red up arrow is local output changes since the last synced state and the green down arrow is remote input changes since that state.
+Command guide:
 
-Press Tab after `/pisync ` to autocomplete subcommands with short descriptions.
+| Command                         | Use it when                                                           |
+| ------------------------------- | --------------------------------------------------------------------- |
+| `/pisync init`                  | Configure pi-sync for this machine.                                   |
+| `/pisync doctor`                | Verify config, Git access, secret scan, and lock status.              |
+| `/pisync status [--verbose]`    | Check local/remote drift and optionally list changed paths.           |
+| `/pisync diff`                  | Review textual differences before pushing or pulling.                 |
+| `/pisync push`                  | Publish local Pi settings to the Git repo.                            |
+| `/pisync pull`                  | Apply remote Git settings locally after backup and confirmation.      |
+| `/pisync sync`                  | Conservatively push or pull when only one side changed.               |
+| `/pisync history`               | Show recent synced Git commits.                                       |
+| `/pisync checkout <commit-ish>` | Restore a previous commit locally without changing the remote branch. |
+| `/pisync unlock --stale`        | Remove a stale local lock after confirming no sync is running.        |
 
 Useful flags:
 
 - `--yes` / `-y`: skip confirmation prompts.
 - `--force`: allow push/pull when both local and remote state changed.
+- `--verbose` / `-v`: show changed paths for `/pisync status`.
 - `--stale`: remove a stale local lock.
+
+Press Tab after `/pisync ` to autocomplete subcommands with short descriptions.
+
+## Footer status
+
+pi-sync shows drift in the footer:
+
+```text
+PI-SYNC: ↑1 ↓0
+```
+
+- `↑` means local output changes that are not pushed.
+- `↓` means remote input changes that are not pulled.
+
+Common states:
+
+| Status  | Meaning                | Next step                                                                    |
+| ------- | ---------------------- | ---------------------------------------------------------------------------- |
+| `↑0 ↓0` | Local and remote match | Nothing                                                                      |
+| `↑1 ↓0` | Local files changed    | `/pisync diff`, then `/pisync push`                                          |
+| `↑0 ↓1` | Remote changed         | `/pisync pull`                                                               |
+| `↑1 ↓1` | Both changed           | `/pisync diff`, then choose `/pisync pull --force` or `/pisync push --force` |
 
 ## What is synced
 
@@ -90,8 +198,24 @@ It excludes `.env*`, `node_modules`, `.git`, `.pisync`, `pi-sync.json`, and path
 
 ## Safety
 
+- Use a private Git repository for synced Pi config.
 - Local state, clone cache, locks, and backups live under `~/.pi/agent/.pisync/`.
 - Pull and checkout create local backups before changing files.
 - Pull and checkout apply normal Git-tracked files while still preflighting paths and refusing symlink escapes.
 - Checkout restores a previous commit locally without changing the remote branch; use `/pisync push` afterwards only if you want to publish that checked-out state as a new commit.
 - Auto-sync is enabled by default but never pushes local changes automatically; it only pulls safe remote changes or asks you to resolve conflicts manually.
+- Secret scanning is best-effort. Do not intentionally store API keys or tokens in synced Pi config.
+
+## Troubleshooting
+
+| Symptom                                        | Likely cause                                            | Suggested fix                                                                                                                   |
+| ---------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `/pisync doctor` says repository access failed | Git auth is not configured for the repo URL             | For GitHub HTTPS, run `gh auth login` and `gh auth setup-git`. For SSH, run `ssh -T git@github.com` and configure your SSH key. |
+| `Permission denied (publickey)`                | SSH repository URL without working SSH key setup        | Use an HTTPS repository URL, or add/load an SSH key registered with GitHub.                                                     |
+| `gh: command not found`                        | GitHub CLI is not installed                             | Install it with `brew install gh`, then run `gh auth login` and `gh auth setup-git`.                                            |
+| Footer shows `PI-SYNC: ↑1 ↓0`                  | Local config differs from the last synced state         | Run `/pisync diff`, then `/pisync push` if you want to publish local changes.                                                   |
+| Footer shows `PI-SYNC: ↑0 ↓1`                  | Remote config changed                                   | Run `/pisync pull`.                                                                                                             |
+| Footer shows both local and remote changes     | Local and remote diverged                               | Run `/pisync diff`, then choose `/pisync pull --force` or `/pisync push --force`.                                               |
+| Push is refused due to possible secrets        | A synced file path or content matched secret heuristics | Remove the secret/token from synced config or rename/exclude the sensitive file.                                                |
+| A lock is stale                                | A previous sync was interrupted                         | After verifying no sync is running, run `/pisync unlock --stale`.                                                               |
+| Checkout restored older local files            | `/pisync checkout` is local-only by design              | Run `/pisync pull` to return to remote latest, or `/pisync push` to publish the checked-out state.                              |

@@ -1,6 +1,6 @@
 {
   "name": "@dbaida/pi-sync",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Pi extension that syncs Pi configuration through a Git repository.",
   "type": "module",
   "packageManager": "yarn@4.16.0",
