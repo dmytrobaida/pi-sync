@@ -22,9 +22,8 @@ const SUBCOMMAND_COMPLETIONS: SubcommandCompletion[] = [
   {
     value: "config",
     label: "config",
-    description:
-      "Show the effective repository, branch, profile, and local paths.",
-    keywords: ["settings", "repository", "profile"],
+    description: "Show the effective repository, branch, and local paths.",
+    keywords: ["settings", "repository"],
   },
   {
     value: "status",

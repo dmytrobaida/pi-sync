@@ -1,4 +1,4 @@
-import { DEFAULT_BRANCH, DEFAULT_PROFILE } from "../domain/constants.js";
+import { DEFAULT_BRANCH } from "../domain/constants.js";
 import type { PartialConfig, SyncConfig } from "../domain/types.js";
 import { readJsonIfExists } from "../utils/json-utils.js";
 import { localConfigPath } from "../utils/path-utils.js";
@@ -19,7 +19,6 @@ export async function loadConfig(): Promise<SyncConfig> {
   return {
     repository,
     branch: partial.branch ?? DEFAULT_BRANCH,
-    profile: partial.profile ?? DEFAULT_PROFILE,
     autoSync: partial.autoSync ?? true,
   };
 }
@@ -38,7 +37,6 @@ export async function loadPartialConfig(): Promise<PartialConfig> {
       process.env.PI_SYNC_REPO ??
       fileConfig.repository,
     branch: process.env.PI_SYNC_BRANCH ?? fileConfig.branch,
-    profile: process.env.PI_SYNC_PROFILE ?? fileConfig.profile,
     autoSync: process.env.PI_SYNC_AUTO_SYNC ?? fileConfig.autoSync,
   };
 }

@@ -38,7 +38,7 @@ export class GitStore {
    * Ensure the local clone exists and is checked out to the configured branch.
    */
   async prepare(): Promise<void> {
-    const dir = repoDir(this.config.profile);
+    const dir = repoDir();
 
     try {
       await fs.access(path.join(dir, ".git"), fsConstants.F_OK);
@@ -71,14 +71,14 @@ export class GitStore {
   }
 
   /**
-   * Run a Git command inside the profile clone.
+   * Run a Git command inside the local clone.
    *
    * @param args Git CLI arguments.
    */
   async run(args: string[]): Promise<string> {
     try {
       const { stdout } = await execFileAsync("git", args, {
-        cwd: repoDir(this.config.profile),
+        cwd: repoDir(),
         maxBuffer: 10 * 1024 * 1024,
       });
 
@@ -142,7 +142,6 @@ export class GitStore {
       id: await this.commitId(commitish, files),
       createdAt: await this.commitCreatedAt(commitish),
       machine: "git",
-      profile: this.config.profile,
       files,
     };
   }
@@ -153,7 +152,7 @@ export class GitStore {
    * @param snapshot Snapshot to materialize.
    */
   async writeSnapshot(snapshot: Snapshot): Promise<void> {
-    const root = repoDir(this.config.profile);
+    const root = repoDir();
 
     await this.removeSyncedRepoPaths();
     await materializeSnapshot(snapshot, root);
@@ -210,7 +209,7 @@ export class GitStore {
       "git",
       ["show", `${commitish}:${repoPath}`],
       {
-        cwd: repoDir(this.config.profile),
+        cwd: repoDir(),
         encoding: "buffer",
         maxBuffer: 50 * 1024 * 1024,
       },
@@ -244,7 +243,7 @@ export class GitStore {
   }
 
   private async removeSyncedRepoPaths(): Promise<void> {
-    const root = repoDir(this.config.profile);
+    const root = repoDir();
 
     for (const relativePath of syncPathspecs()) {
       await fs.rm(safeJoin(root, relativePath), {

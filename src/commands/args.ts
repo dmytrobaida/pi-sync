@@ -37,7 +37,7 @@ export function usage(): string {
   return [
     "Usage: /pisync <command>",
     "Commands: init, config, status [--verbose], diff, doctor, push, pull, sync, history, checkout <commit-ish>, unlock --stale",
-    "Config: set PI_SYNC_REPOSITORY plus optional PI_SYNC_BRANCH/profile, or edit ~/.pi/agent/pi-sync.local.json.",
+    "Config: set PI_SYNC_REPOSITORY plus optional PI_SYNC_BRANCH, or edit ~/.pi/agent/pi-sync.json.",
   ].join("\n");
 }
 

@@ -5,15 +5,12 @@ import { readJsonIfExists, writeJson } from "../utils/json-utils.js";
 import { statePath } from "../utils/path-utils.js";
 
 /**
- * Read persisted local sync state for a profile.
- *
- * @param profile Profile name.
+ * Read persisted local sync state.
  */
-export async function readState(profile: string): Promise<SyncState> {
+export async function readState(): Promise<SyncState> {
   return (
-    (await readJsonIfExists<SyncState>(statePath(profile))) ?? {
+    (await readJsonIfExists<SyncState>(statePath())) ?? {
       version: VERSION,
-      profile,
       lastFileHashes: {},
     }
   );
@@ -22,18 +19,15 @@ export async function readState(profile: string): Promise<SyncState> {
 /**
  * Persist local sync state after applying or pushing a snapshot.
  *
- * @param profile Profile name.
  * @param snapshot Snapshot represented by the commit.
  * @param commit Git commit ID associated with the state.
  */
 export async function writeSyncState(
-  profile: string,
   snapshot: Snapshot,
   commit: string,
 ): Promise<void> {
-  await writeJson(statePath(profile), {
+  await writeJson(statePath(), {
     version: VERSION,
-    profile,
     lastAppliedSnapshot: commit,
     lastAppliedCommit: commit,
     lastFileHashes: fileHashMap(snapshot),

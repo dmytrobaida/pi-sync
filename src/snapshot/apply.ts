@@ -11,7 +11,7 @@ import { createSnapshot, decodeBase64Strict, hashBuffer } from "./snapshot.js";
  */
 export async function applySnapshot(snapshot: Snapshot): Promise<void> {
   const root = agentDir();
-  const current = await createSnapshot(snapshot.profile);
+  const current = await createSnapshot();
   const plan = preflightSnapshotApply(root, snapshot, current);
 
   await preflightSnapshotMutations(root, plan);

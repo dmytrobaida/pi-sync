@@ -1,4 +1,3 @@
-import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -8,7 +7,6 @@ import { loadConfig, loadPartialConfig } from "../config/config.js";
 import {
   ACTIVITY_STATUS_KEY,
   DEFAULT_BRANCH,
-  DEFAULT_PROFILE,
   NO_DIFF_MESSAGE,
 } from "../domain/constants.js";
 import type { CommandOptions, Snapshot, SyncState } from "../domain/types.js";
@@ -30,11 +28,13 @@ import {
   hasLocalChanges,
   remoteChangedSinceState,
 } from "../state/state.js";
-import { errorMessage, writeJson } from "../utils/json-utils.js";
+import { errorMessage } from "../utils/json-utils.js";
 import { localConfigPath, repoDir, stateDir } from "../utils/path-utils.js";
 import { isEnabled, parseOptions, splitArgs, usage } from "./args.js";
+import { repositoryAccessReport } from "./auth.js";
 import { syncInputs } from "./context.js";
 import { setSyncFooter, syncDrift } from "./footer-status.js";
+import { initConfig } from "./init.js";
 import { SyncOperations } from "./operations.js";
 
 /**
@@ -129,30 +129,6 @@ async function runCommand(
   }
 }
 
-async function initConfig(ctx: ExtensionCommandContext): Promise<void> {
-  const configPath = localConfigPath();
-
-  try {
-    await fs.access(configPath, fsConstants.F_OK);
-    ctx.ui.notify(`Config already exists: ${configPath}`, "info");
-
-    return;
-  } catch {
-    // Create below.
-  }
-
-  await writeJson(configPath, {
-    repository: "git@github.com:<user>/<repo>.git",
-    branch: DEFAULT_BRANCH,
-    profile: DEFAULT_PROFILE,
-    autoSync: true,
-  });
-  ctx.ui.notify(
-    `Created ${configPath}. Fill in the Git repository, then run /pisync doctor.`,
-    "info",
-  );
-}
-
 async function showConfig(ctx: ExtensionCommandContext): Promise<void> {
   const partial = await loadPartialConfig();
 
@@ -161,10 +137,9 @@ async function showConfig(ctx: ExtensionCommandContext): Promise<void> {
       "pi-sync config:",
       `repository: ${partial.repository ?? "missing"}`,
       `branch: ${partial.branch ?? DEFAULT_BRANCH}`,
-      `profile: ${partial.profile ?? DEFAULT_PROFILE}`,
       `autoSync: ${isEnabled(partial.autoSync ?? process.env.PI_SYNC_AUTO_SYNC, true) ? "enabled" : "disabled"}`,
       `local config: ${localConfigPath()}`,
-      `local clone: ${repoDir(partial.profile ?? DEFAULT_PROFILE)}`,
+      `local clone: ${repoDir()}`,
     ].join("\n"),
     "info",
   );
@@ -183,7 +158,6 @@ async function status(
   const remoteCommit = await new GitStore(config).currentCommit();
   const drift = syncDrift(local, remote, state);
   const messages = [
-    `profile: ${config.profile}`,
     remote != null
       ? `remote: ${remote.id} at ${remoteCommit}`
       : "remote: empty",
@@ -268,10 +242,20 @@ async function doctor(ctx: ExtensionCommandContext): Promise<void> {
     messages.push(
       `config: ok (${config.repository}#${config.branch}/repo-root)`,
     );
-    const gitStore = new GitStore(config);
+    const accessReport = await repositoryAccessReport(config.repository);
 
-    await gitStore.prepare();
-    messages.push(`git: ok (${await gitStore.currentCommit()})`);
+    messages.push(...accessReport);
+
+    if (
+      accessReport.some((line) => line.startsWith("repository access: failed"))
+    ) {
+      level = "warning";
+    } else {
+      const gitStore = new GitStore(config);
+
+      await gitStore.prepare();
+      messages.push(`git: ok (${await gitStore.currentCommit()})`);
+    }
   } catch (error) {
     level = "warning";
     messages.push(`config/git: ${errorMessage(error)}`);
@@ -329,7 +313,7 @@ async function unlock(
 }
 
 async function appendLocalChecks(messages: string[]): Promise<void> {
-  const local = await createSnapshot(DEFAULT_PROFILE);
+  const local = await createSnapshot();
   const secrets = scanSnapshot(local);
   const lock = await readLock();
 

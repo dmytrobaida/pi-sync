@@ -28,15 +28,6 @@ export function posixJoin(...parts: string[]): string {
 }
 
 /**
- * Convert an arbitrary profile name into a filesystem-safe name.
- *
- * @param value Raw profile name.
- */
-export function safeName(value: string): string {
-  return value.replace(/[^A-Za-z0-9._-]/g, "_");
-}
-
-/**
  * Convert platform separators to POSIX separators.
  *
  * @param value Path string to normalize.
@@ -69,28 +60,24 @@ export function stateDir(): string {
 }
 
 /**
- * Return the local clone directory for a profile.
- *
- * @param profile Profile name.
+ * Return the local clone directory.
  */
-export function repoDir(profile: string): string {
-  return path.join(stateDir(), "repos", safeName(profile));
+export function repoDir(): string {
+  return path.join(stateDir(), "repo");
 }
 
 /**
  * Return the local pi-sync config file path.
  */
 export function localConfigPath(): string {
-  return path.join(agentDir(), "pi-sync.local.json");
+  return path.join(agentDir(), "pi-sync.json");
 }
 
 /**
- * Return the local sync state file path for a profile.
- *
- * @param profile Profile name.
+ * Return the local sync state file path.
  */
-export function statePath(profile: string): string {
-  return path.join(stateDir(), `${safeName(profile)}.state.json`);
+export function statePath(): string {
+  return path.join(stateDir(), "state.json");
 }
 
 /**

@@ -24,24 +24,27 @@ Run inside Pi:
 /pisync init
 ```
 
-Then edit the generated local-only file:
+The init flow asks for a Git repository URL, branch, and whether auto-sync should be enabled. HTTPS GitHub URLs are recommended because they can reuse an existing GitHub CLI login or Git credential helper without SSH key setup.
+
+The generated local-only file is stored at:
 
 ```text
-~/.pi/agent/pi-sync.local.json
+~/.pi/agent/pi-sync.json
 ```
 
 Example:
 
 ```json
 {
-  "repository": "git@github.com:<user>/<repo>.git",
+  "repository": "https://github.com/<user>/<repo>.git",
   "branch": "main",
-  "profile": "default",
   "autoSync": true
 }
 ```
 
-Environment overrides are also supported: `PI_SYNC_REPOSITORY` (or `PI_SYNC_REPO`), `PI_SYNC_BRANCH`, `PI_SYNC_PROFILE`, and `PI_SYNC_AUTO_SYNC`.
+For GitHub HTTPS repositories, `/pisync init` can optionally run `gh auth setup-git` after confirming with you. This lets Git reuse your existing GitHub CLI login. SSH URLs still require normal SSH key and ssh-agent setup.
+
+Environment overrides are also supported: `PI_SYNC_REPOSITORY` (or `PI_SYNC_REPO`), `PI_SYNC_BRANCH`, and `PI_SYNC_AUTO_SYNC`. Run `/pisync doctor` after setup to verify repository access and get auth-specific guidance.
 
 ## Commands
 
@@ -83,7 +86,7 @@ themes/
 extensions/
 ```
 
-It excludes `.env*`, `node_modules`, `.git`, `.pisync`, `pi-sync.local.json`, and paths containing `secret` or `token`, and it refuses to push common API-key patterns. `/pisync diff` and confirmation prompts use textual `git diff --no-index` output between remote files and local files.
+It excludes `.env*`, `node_modules`, `.git`, `.pisync`, `pi-sync.json`, and paths containing `secret` or `token`, and it refuses to push common API-key patterns. `/pisync diff` and confirmation prompts use textual `git diff --no-index` output between remote files and local files.
 
 ## Safety
 

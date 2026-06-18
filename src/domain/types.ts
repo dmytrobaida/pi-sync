@@ -1,14 +1,12 @@
 export type SyncConfig = {
   repository: string;
   branch: string;
-  profile: string;
   autoSync: boolean | string;
 };
 
 export type PartialConfig = {
   repository?: string;
   branch?: string;
-  profile?: string;
   autoSync?: boolean | string;
 };
 
@@ -23,13 +21,11 @@ export type Snapshot = {
   id: string;
   createdAt: string;
   machine: string;
-  profile: string;
   files: SnapshotFile[];
 };
 
 export type SyncState = {
   version: number;
-  profile: string;
   lastAppliedSnapshot?: string;
   lastAppliedCommit?: string;
   lastFileHashes: Record<string, string>;

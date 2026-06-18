@@ -251,7 +251,7 @@ export class SyncOperations {
     }
 
     const config = await loadConfig();
-    const local = await createSnapshot(config.profile);
+    const local = await createSnapshot();
     const gitStore = new GitStore(config);
 
     await gitStore.prepare();
@@ -282,14 +282,10 @@ export class SyncOperations {
     config: SyncConfig,
     remote: Snapshot,
   ): Promise<void> {
-    const backup = await backupLocal(config.profile);
+    const backup = await backupLocal();
 
     await applySnapshot(remote);
-    await writeSyncState(
-      config.profile,
-      remote,
-      await new GitStore(config).currentCommit(),
-    );
+    await writeSyncState(remote, await new GitStore(config).currentCommit());
     await refreshSyncFooter(this.ctx);
     this.ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
 
@@ -316,11 +312,7 @@ export class SyncOperations {
       );
     }
 
-    await writeSyncState(
-      config.profile,
-      remote,
-      await new GitStore(config).currentCommit(),
-    );
+    await writeSyncState(remote, await new GitStore(config).currentCommit());
     await refreshSyncFooter(this.ctx);
     this.ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
 
@@ -343,7 +335,7 @@ export class SyncOperations {
     const committed = await gitStore.commitAndPush(`pi-sync: ${local.id}`);
     const after = await gitStore.currentCommit();
 
-    await writeSyncState(config.profile, local, after !== "" ? after : before);
+    await writeSyncState(local, after !== "" ? after : before);
     await refreshSyncFooter(this.ctx);
     this.ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
 
@@ -361,7 +353,7 @@ export class SyncOperations {
     config: SyncConfig,
     remote: Snapshot,
   ): Promise<void> {
-    const backup = await backupLocal(config.profile);
+    const backup = await backupLocal();
 
     await applySnapshot(remote);
     await refreshSyncFooter(this.ctx);
@@ -412,8 +404,8 @@ function hasDiverged(
   );
 }
 
-async function backupLocal(profile: string): Promise<string> {
-  const snapshot = await createSnapshot(profile);
+async function backupLocal(): Promise<string> {
+  const snapshot = await createSnapshot();
   const backupDirectory = path.join(stateDir(), "backups");
 
   await fs.mkdir(backupDirectory, { recursive: true });

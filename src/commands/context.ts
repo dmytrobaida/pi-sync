@@ -23,8 +23,8 @@ export async function syncInputs(): Promise<SyncInputs> {
 
   return {
     config,
-    local: await createSnapshot(config.profile),
+    local: await createSnapshot(),
     remote: await gitStore.readSnapshot(),
-    state: await readState(config.profile),
+    state: await readState(),
   };
 }

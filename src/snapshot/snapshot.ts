@@ -14,10 +14,8 @@ import { agentDir, posixJoin, safeJoin, toPosix } from "../utils/path-utils.js";
 
 /**
  * Create a snapshot from the local Pi agent configuration.
- *
- * @param profile Profile name to store in the snapshot metadata.
  */
-export async function createSnapshot(profile: string): Promise<Snapshot> {
+export async function createSnapshot(): Promise<Snapshot> {
   const files = await collectFiles(agentDir());
 
   return {
@@ -25,7 +23,6 @@ export async function createSnapshot(profile: string): Promise<Snapshot> {
     id: snapshotId(),
     createdAt: new Date().toISOString(),
     machine: os.hostname(),
-    profile,
     files,
   };
 }
@@ -48,7 +45,7 @@ export function isDeniedPath(relativePath: string): boolean {
     base.endsWith(".env") ||
     base.includes("secret") ||
     base.includes("token") ||
-    base === "pi-sync.local.json"
+    base === "pi-sync.json"
   );
 }
 

@@ -24,7 +24,7 @@ import { errorMessage } from "./utils/json-utils.js";
 export { isEnabled, parseOptions, splitArgs } from "./commands/args.js";
 export { preflightSnapshotApply } from "./snapshot/apply.js";
 export { isDeniedPath, scanSnapshot } from "./snapshot/snapshot.js";
-export { posixJoin, safeJoin, safeName } from "./utils/path-utils.js";
+export { posixJoin, safeJoin } from "./utils/path-utils.js";
 
 /**
  * Register the Git-backed Pi settings sync extension.
