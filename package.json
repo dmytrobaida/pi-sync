@@ -1,16 +1,31 @@
 {
   "name": "@dbaida/pi-sync",
-  "version": "1.0.0",
-  "description": "Pi extension that syncs Pi configuration through a Git repository.",
+  "version": "1.0.1",
+  "description": "Git-backed Pi extension for syncing agent settings, skills, prompts, themes, and extensions across machines.",
   "type": "module",
   "packageManager": "yarn@4.16.0",
   "license": "MIT",
+  "author": "Dmytro Baida",
+  "homepage": "https://github.com/dmytrobaida/pi-sync#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dmytrobaida/pi-sync.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dmytrobaida/pi-sync/issues"
+  },
   "keywords": [
+    "pi",
     "pi-package",
     "pi-extension",
-    "pi",
+    "pi-sync",
+    "git",
     "sync",
-    "git"
+    "settings",
+    "configuration",
+    "skills",
+    "prompts",
+    "themes"
   ],
   "files": [
     "src",
