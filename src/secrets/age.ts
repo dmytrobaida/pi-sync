@@ -1,6 +1,5 @@
 import { execFile, spawn } from "node:child_process";
 import fs from "node:fs/promises";
-import path from "node:path";
 import { promisify } from "node:util";
 
 import { errorMessage, firstNonEmpty } from "../utils/json-utils.js";
@@ -61,35 +60,6 @@ export async function readRecipient(
   }
 
   return recipient;
-}
-
-/**
- * Generate a new age identity file if one does not exist yet.
- *
- * @param identityPath Destination identity file path.
- * @returns The recipient (public key) extracted from the new identity.
- */
-export async function ensureIdentity(
-  identityPath: string = ageIdentityPath(),
-): Promise<string> {
-  try {
-    return await readRecipient(identityPath);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw error;
-    }
-  }
-
-  await fs.mkdir(path.dirname(identityPath), { recursive: true });
-  await execFileAsync("age-keygen", ["-o", identityPath]);
-
-  try {
-    await fs.chmod(identityPath, 0o600);
-  } catch {
-    // File permissions are best-effort on some platforms/filesystems.
-  }
-
-  return readRecipient(identityPath);
 }
 
 /**

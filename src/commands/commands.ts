@@ -143,6 +143,7 @@ async function showConfig(ctx: ExtensionCommandContext): Promise<void> {
       `repository: ${partial.repository ?? "missing"}`,
       `branch: ${partial.branch ?? DEFAULT_BRANCH}`,
       `autoSync: ${isEnabled(partial.autoSync ?? process.env.PI_SYNC_AUTO_SYNC, true) ? "enabled" : "disabled"}`,
+      `secrets: ${isEnabled(partial.secrets ?? process.env.PI_SYNC_SECRETS, false) ? "enabled" : "disabled"}`,
       `local config: ${localConfigPath()}`,
       `local clone: ${repoDir()}`,
     ].join("\n"),

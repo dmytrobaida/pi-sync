@@ -5,6 +5,7 @@ import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
 import { DEFAULT_BRANCH } from "../domain/constants.js";
 import type { PartialConfig } from "../domain/types.js";
+import { SecretsOperations } from "../secrets/operations.js";
 import { writeJson } from "../utils/json-utils.js";
 import { localConfigPath } from "../utils/path-utils.js";
 import {
@@ -37,10 +38,19 @@ export async function initConfig(ctx: ExtensionCommandContext): Promise<void> {
     }
   }
 
-  const config = await promptConfig(ctx);
+  const { config, secretsPassphrase } = await promptConfig(ctx);
 
   await writeJson(configPath, config);
   await maybeSetupGithubAuth(ctx, config.repository);
+
+  if (
+    config.secrets === true &&
+    secretsPassphrase !== undefined &&
+    secretsPassphrase !== ""
+  ) {
+    await new SecretsOperations(ctx).setup(secretsPassphrase);
+  }
+
   ctx.ui.notify(
     `Created ${configPath}. Run /pisync doctor to verify repository access.`,
     "info",
@@ -57,9 +67,10 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-async function promptConfig(
-  ctx: ExtensionCommandContext,
-): Promise<PartialConfig & { repository: string }> {
+async function promptConfig(ctx: ExtensionCommandContext): Promise<{
+  config: PartialConfig & { repository: string };
+  secretsPassphrase?: string;
+}> {
   const repository = await promptRequired(
     ctx,
     "Git repository URL",
@@ -70,11 +81,27 @@ async function promptConfig(
     "Enable auto-sync?",
     "Auto-sync pulls safe remote changes on session start but never pushes local changes automatically.",
   );
+  const secrets = await ctx.ui.confirm(
+    "Enable encrypted secrets sync?",
+    "Syncs API keys from auth.json as age-encrypted GitHub variables. You set a passphrase once per machine.",
+  );
+  let secretsPassphrase: string | undefined;
+
+  if (secrets) {
+    secretsPassphrase = await ctx.ui.input(
+      "Secrets passphrase",
+      "Pick a new passphrase for your first machine, or enter the one your other machines already use.",
+    );
+  }
 
   return {
-    repository,
-    branch: branch === "" ? DEFAULT_BRANCH : branch,
-    autoSync,
+    config: {
+      repository,
+      branch: branch === "" ? DEFAULT_BRANCH : branch,
+      autoSync,
+      secrets,
+    },
+    secretsPassphrase,
   };
 }
 

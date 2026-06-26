@@ -2,12 +2,14 @@ export type SyncConfig = {
   repository: string;
   branch: string;
   autoSync: boolean | string;
+  secrets: boolean | string;
 };
 
 export type PartialConfig = {
   repository?: string;
   branch?: string;
   autoSync?: boolean | string;
+  secrets?: boolean | string;
 };
 
 export type SnapshotFile = {

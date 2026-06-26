@@ -6,8 +6,6 @@ import { SecretsOperations } from "../secrets/operations.js";
 import { withLock } from "../state/lock.js";
 import { errorMessage } from "../utils/json-utils.js";
 
-const SECRETS_ACTIVITY = "🔐 secrets";
-
 /**
  * Parse and execute a /pisync secrets subcommand.
  *
@@ -19,11 +17,7 @@ export async function handleSecretsCommand(
   ctx: ExtensionCommandContext,
 ): Promise<void> {
   const [action = "list", ...rest] = options.args;
-  const opsOptions = {
-    yes: options.yes,
-    verbose: options.verbose,
-    silent: options.silent,
-  };
+  const opsOptions = { yes: options.yes, silent: options.silent };
 
   try {
     await runSecretsAction(action, rest, opsOptions, ctx);
@@ -36,7 +30,7 @@ export async function handleSecretsCommand(
 async function runSecretsAction(
   action: string,
   positional: string[],
-  options: { yes: boolean; verbose: boolean; silent: boolean },
+  options: { yes: boolean; silent: boolean },
   ctx: ExtensionCommandContext,
 ): Promise<void> {
   const ops = (): SecretsOperations => new SecretsOperations(ctx, options);
@@ -46,43 +40,36 @@ async function runSecretsAction(
       ctx.ui.notify(secretsUsage(), "info");
 
       return;
-    case "init":
-      ctx.ui.setStatus(ACTIVITY_STATUS_KEY, SECRETS_ACTIVITY);
-      await ops().init();
-      ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
+
+    case "setup":
+      await runSetup(ops, positional, ctx);
 
       return;
+
     case "doctor":
       await ops().doctor();
 
       return;
+
     case "list":
       await ops().list();
 
       return;
 
-    case "add":
-      await runNameAction(ops, positional, "add", ctx);
-
-      return;
-
-    case "remove":
-      await runNameAction(ops, positional, "remove", ctx);
-
-      return;
-
     case "push":
       await withLock("secrets-push", async () => {
-        await ops().push();
+        await ops().pushAll();
       });
 
       return;
+
     case "pull":
       await withLock("secrets-pull", async () => {
-        await ops().pull();
+        await ops().pullAll();
       });
 
       return;
+
     default:
       ctx.ui.notify(
         `Unknown /pisync secrets command: ${action}\n\n${secretsUsage()}`,
@@ -91,30 +78,27 @@ async function runSecretsAction(
   }
 }
 
-async function runNameAction(
+async function runSetup(
   ops: () => SecretsOperations,
   positional: string[],
-  kind: "add" | "remove",
   ctx: ExtensionCommandContext,
 ): Promise<void> {
-  const name = positional[0];
+  const provided = positional[0];
+  const passphrase =
+    provided !== ""
+      ? provided
+      : await ctx.ui.input(
+          "Secrets passphrase",
+          "Enter the passphrase used on your other machine, or pick a new one for your first machine.",
+        );
 
-  if (name === "") {
-    ctx.ui.notify(
-      `Usage: /pisync secrets ${kind} <PROVIDER>\n<PROVIDER> is an auth.json provider with type "api_key" (e.g. zai, xai).`,
-      "warning",
-    );
+  if (passphrase === undefined || passphrase === "") {
+    ctx.ui.notify("A passphrase is required for setup.", "warning");
 
     return;
   }
 
-  await withLock(`secrets-${kind}`, async () => {
-    if (kind === "add") {
-      await ops().add(name);
-    } else {
-      await ops().remove(name);
-    }
-  });
+  await ops().setup(passphrase);
 }
 
 /**
@@ -123,8 +107,10 @@ async function runNameAction(
 export function secretsUsage(): string {
   return [
     "Usage: /pisync secrets <command>",
-    "Commands: init, add <PROVIDER>, remove <PROVIDER>, push, pull, list, doctor",
-    "Provider keys are read from and written to ~/.pi/agent/auth.json (type: api_key).",
+    "Commands: setup, push, pull, list, doctor",
+    "With the `secrets` toggle on, push and pull happen automatically with",
+    "/pisync push and /pisync pull. These commands are for manual control.",
+    "Provider keys are read from and written to ~/.pi/agent/auth.json.",
     "Encrypted with age and stored as GitHub repository variables (PISYNC_SECRET_*).",
   ].join("\n");
 }

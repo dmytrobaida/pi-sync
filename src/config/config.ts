@@ -20,6 +20,7 @@ export async function loadConfig(): Promise<SyncConfig> {
     repository,
     branch: partial.branch ?? DEFAULT_BRANCH,
     autoSync: partial.autoSync ?? true,
+    secrets: partial.secrets ?? false,
   };
 }
 
@@ -38,6 +39,7 @@ export async function loadPartialConfig(): Promise<PartialConfig> {
       fileConfig.repository,
     branch: process.env.PI_SYNC_BRANCH ?? fileConfig.branch,
     autoSync: process.env.PI_SYNC_AUTO_SYNC ?? fileConfig.autoSync,
+    secrets: process.env.PI_SYNC_SECRETS ?? fileConfig.secrets,
   };
 }
 

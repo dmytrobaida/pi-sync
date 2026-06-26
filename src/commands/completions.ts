@@ -96,43 +96,28 @@ const SUBCOMMAND_COMPLETIONS: SubcommandCompletion[] = [
 
 const SECRETS_SUBCOMMAND_COMPLETIONS: SubcommandCompletion[] = [
   {
-    value: "init",
-    label: "init",
+    value: "setup",
+    label: "setup",
     description:
-      "Generate/load the local age identity and publish its recipient.",
-    keywords: ["setup", "age", "key"],
-  },
-  {
-    value: "add",
-    label: "add <PROVIDER>",
-    description:
-      "Encrypt one auth.json provider key and store it as a GitHub variable.",
-    keywords: ["create", "upload", "track", "api", "key"],
-  },
-  {
-    value: "remove",
-    label: "remove <PROVIDER>",
-    description: "Delete a tracked provider secret variable.",
-    keywords: ["delete", "untrack"],
+      "Enter your passphrase once, derive and cache the local secrets key.",
+    keywords: ["init", "passphrase", "age", "key", "enable"],
   },
   {
     value: "push",
     label: "push",
-    description:
-      "Re-encrypt and update every tracked provider key from auth.json.",
+    description: "Encrypt and publish every auth.json provider key now.",
     keywords: ["upload", "refresh"],
   },
   {
     value: "pull",
     label: "pull",
-    description:
-      "Decrypt every tracked provider key into auth.json (backed up first).",
+    description: "Decrypt every provider key into auth.json (backed up first).",
     keywords: ["download", "restore"],
   },
   {
     value: "list",
     label: "list",
-    description: "Show tracked secret names and local/remote presence.",
+    description: "Show tracked providers and local/remote presence.",
     keywords: ["show", "status"],
   },
   {

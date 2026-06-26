@@ -12,7 +12,6 @@ import {
   AGE_RECIPIENT_VARIABLE,
   SECRETS_VARIABLE_PREFIX,
 } from "../domain/constants.js";
-import type { SyncConfig } from "../domain/types.js";
 import {
   ageIdentityPath,
   authJsonPath,
@@ -22,7 +21,6 @@ import {
   decryptWithIdentity,
   encryptForRecipient,
   ensureAgeCli,
-  ensureIdentity,
   readRecipient,
 } from "./age.js";
 import {
@@ -31,201 +29,123 @@ import {
   writeAuthProviderKey,
 } from "./auth-storage.js";
 import {
-  deleteVariable,
   getVariable,
   listVariables,
   requireGithubRepo,
   setVariable,
 } from "./github.js";
+import {
+  getCachedKey,
+  getOrPromptKey,
+  recipientMatchesPublished,
+  type ResolvedKey,
+  setupKeyFromPassphrase,
+} from "./key-manager.js";
 
 type SecretsSettings = {
   yes: boolean;
-  verbose: boolean;
   silent: boolean;
 };
 
 /**
  * Coordinate encrypted-secret sync between local auth.json provider keys and
- * age-encrypted GitHub repository Variables.
+ * age-encrypted GitHub repository Variables, driven by a single toggle.
+ *
+ * When the `secrets` config toggle is on, {@link pushAll} and {@link pullAll}
+ * run automatically as part of the normal `/pisync push` and `/pisync pull`.
+ * The decryption key is derived once from a passphrase and cached locally, so
+ * day-to-day sync is silent.
  */
 export class SecretsOperations {
   /**
    * Create a secrets operation runner.
    *
-   * @param ctx Pi context used for UI.
+   * @param ctx Pi context used for UI and the one-time passphrase prompt.
    * @param settings Runtime behavior toggles.
    */
   constructor(
     private readonly ctx: ExtensionCommandContext | ExtensionContext,
-    private readonly settings: SecretsSettings = {
-      yes: false,
-      verbose: false,
-      silent: false,
-    },
+    private readonly settings: SecretsSettings = { yes: false, silent: false },
   ) {}
 
   /**
-   * Generate or load the local age identity and publish its recipient.
+   * Enter the passphrase once, derive and cache the local key, publish the
+   * recipient. Called from `/pisync init` (when the toggle is on) and from
+   * `/pisync secrets setup`.
+   *
+   * @param passphrase Pre-collected passphrase. When omitted the caller has
+   *   already arranged prompting.
    */
-  async init(): Promise<void> {
+  async setup(passphrase: string): Promise<void> {
     await ensureAgeCli();
-    const config = await loadConfig();
-    const repo = requireGithubRepo(config.repository);
-    const identityPath = ageIdentityPath();
-    const recipient = await ensureIdentity(identityPath);
-
-    await setVariable(repo, AGE_RECIPIENT_VARIABLE, recipient);
+    requireGithubRepo((await loadConfig()).repository);
+    const { recipient } = await setupKeyFromPassphrase(passphrase);
 
     this.notify(
       [
         "Encrypted secrets are ready.",
         `age recipient: ${recipient}`,
-        `local identity: ${identityPath} (private — install the same file on every machine, never sync it)`,
+        `local identity: ${ageIdentityPath()} (passphrase-derived; never synced)`,
         `recipient stored in GitHub variable: ${AGE_RECIPIENT_VARIABLE}`,
-        `Add a provider key with /pisync secrets add <PROVIDER> (e.g. zai, xai).`,
+        "Secrets will now ride along with /pisync push and /pisync pull.",
       ].join("\n"),
       "info",
     );
   }
 
   /**
-   * Encrypt one local auth.json provider key and store it as a GitHub variable.
-   *
-   * @param provider Provider name (e.g. "zai", "xai").
+   * Encrypt every local auth.json api_key provider and store it as a GitHub
+   * variable. Used by `/pisync push` when the toggle is on.
    */
-  async add(provider: string): Promise<void> {
+  async pushAll(): Promise<void> {
     const { repo, recipient } = await this.prepareWrite();
-    const value = readAuthProviderKey(provider);
+    const providers = readAuthApiKeyProviders();
 
-    if (value === undefined) {
-      throw new Error(
-        `No api_key entry for provider "${provider}" in ~/.pi/agent/auth.json. Local providers: ${this.localProviderList()}.`,
-      );
-    }
-
-    const ciphertext = await encryptForRecipient(recipient, value);
-    const variable = this.variableName(provider);
-
-    await setVariable(repo, variable, ciphertext);
-
-    this.notify(
-      `Encrypted and stored provider key ${provider} (${variable}).`,
-      "info",
-    );
-  }
-
-  /**
-   * Remove a tracked provider secret variable.
-   *
-   * @param provider Provider name.
-   */
-  async remove(provider: string): Promise<void> {
-    const { repo } = await this.prepareRead();
-    const variable = this.variableName(provider);
-    const removed = await deleteVariable(repo, variable);
-
-    this.notify(
-      removed
-        ? `Removed secret variable ${variable}.`
-        : `Secret variable ${variable} was not present.`,
-      removed ? "info" : "warning",
-    );
-  }
-
-  /**
-   * Re-encrypt every tracked provider key from local auth.json and refresh it.
-   */
-  async push(): Promise<void> {
-    const { repo, recipient } = await this.prepareWrite();
-    const tracked = await this.trackedProviders(repo);
-
-    if (tracked.length === 0) {
-      this.notify(
-        "No tracked secrets. Use /pisync secrets add <PROVIDER> first.",
-        "warning",
-      );
+    if (providers.length === 0) {
+      this.notify("No api_key providers in auth.json to sync.", "info");
 
       return;
     }
 
-    const confirmed = this.settings.yes
-      ? true
-      : await this.ctx.ui.confirm(
-          `Push ${tracked.length} encrypted provider key(s)?`,
-          tracked.map((name) => `- ${name}`).join("\n"),
-        );
+    let pushed = 0;
 
-    if (!confirmed) {
-      this.notify("Secret push cancelled.", "info");
-
-      return;
-    }
-
-    const missing: string[] = [];
-
-    for (const provider of tracked) {
+    for (const provider of providers) {
       const value = readAuthProviderKey(provider);
 
       if (value === undefined) {
-        missing.push(provider);
-
         continue;
       }
 
       const ciphertext = await encryptForRecipient(recipient, value);
 
       await setVariable(repo, this.variableName(provider), ciphertext);
+      pushed += 1;
     }
 
-    const pushed = tracked.length - missing.length;
-
-    this.notify(
-      [
-        `Pushed ${pushed} encrypted provider key(s).`,
-        ...(missing.length > 0
-          ? [`Skipped (not in local auth.json): ${missing.join(", ")}`]
-          : []),
-      ].join("\n"),
-      missing.length > 0 ? "warning" : "info",
-    );
+    this.notify(`Synced ${pushed} encrypted provider key(s).`, "info");
   }
 
   /**
-   * Decrypt every tracked provider key into local auth.json after a backup.
+   * Decrypt every tracked provider key into auth.json after a backup.
+   * Used by `/pisync pull` when the toggle is on.
+   *
+   * @param key Pre-resolved key. When omitted the interactive prompt is used.
    */
-  async pull(): Promise<void> {
+  async pullAll(key?: ResolvedKey): Promise<void> {
     const { repo } = await this.prepareRead();
+    const resolved = key ?? (await this.resolveKey());
     const variables = (await listVariables(repo))
       .filter((entry) => entry.name.startsWith(SECRETS_VARIABLE_PREFIX))
       .map((entry) => entry.name);
 
     if (variables.length === 0) {
-      this.notify(
-        "No secret variables found. Use /pisync secrets add <PROVIDER> on a machine that has the keys.",
-        "warning",
-      );
-
-      return;
-    }
-
-    const providers = variables.map((variable) =>
-      variable.slice(SECRETS_VARIABLE_PREFIX.length),
-    );
-
-    const confirmed = this.settings.yes
-      ? true
-      : await this.ctx.ui.confirm(
-          `Pull ${providers.length} encrypted provider key(s) into ~/.pi/agent/auth.json?`,
-          `A backup of auth.json is created first.\n${providers.map((name) => `- ${name}`).join("\n")}`,
-        );
-
-    if (!confirmed) {
-      this.notify("Secret pull cancelled.", "info");
+      this.notify("No secret variables to pull yet.", "info");
 
       return;
     }
 
     const backup = await backupAuthJson();
+    let pulled = 0;
     const failures: string[] = [];
 
     for (const variable of variables) {
@@ -236,22 +156,23 @@ export class SecretsOperations {
       }
 
       try {
-        const plaintext = await decryptWithIdentity(ciphertext);
-
-        writeAuthProviderKey(
-          variable.slice(SECRETS_VARIABLE_PREFIX.length),
-          plaintext,
+        const plaintext = await decryptWithIdentity(
+          ciphertext,
+          resolved.identityPath,
         );
+
+        writeAuthProviderKey(this.providerFromVariable(variable), plaintext);
+        pulled += 1;
       } catch (error) {
         failures.push(
-          `${variable.slice(SECRETS_VARIABLE_PREFIX.length)}: ${(error as Error).message}`,
+          `${this.providerFromVariable(variable)}: ${(error as Error).message}`,
         );
       }
     }
 
     this.notify(
       [
-        `Pulled ${providers.length - failures.length} provider key(s) into ~/.pi/agent/auth.json.`,
+        `Pulled ${pulled} provider key(s) into auth.json.`,
         `Backup: ${backup}`,
         ...(failures.length > 0
           ? [`Failed to decrypt: ${failures.join(", ")}`]
@@ -262,8 +183,21 @@ export class SecretsOperations {
   }
 
   /**
-   * Show tracked provider secrets, their remote/local presence, and which local
-   * providers are available to add.
+   * Decrypt secrets using only a cached key, skipping silently when no key is
+   * cached. Used by background auto-sync so it never blocks on a prompt.
+   */
+  async pullAllIfCached(): Promise<void> {
+    const cached = await getCachedKey();
+
+    if (cached === undefined) {
+      return;
+    }
+
+    await this.pullAll(cached);
+  }
+
+  /**
+   * Show tracked providers, local/remote presence, and addable local keys.
    */
   async list(): Promise<void> {
     const { repo } = await this.prepareRead();
@@ -272,22 +206,13 @@ export class SecretsOperations {
       .map((entry) => entry.name);
     const localProviders = readAuthApiKeyProviders();
 
-    if (variables.length === 0 && localProviders.length === 0) {
-      this.notify(
-        "No encrypted secrets tracked and no local api_key providers in auth.json.",
-        "info",
-      );
-
-      return;
-    }
-
     const lines: string[] = [];
 
     if (variables.length > 0) {
       lines.push("Tracked encrypted secrets:");
 
       for (const variable of variables) {
-        const name = variable.slice(SECRETS_VARIABLE_PREFIX.length);
+        const name = this.providerFromVariable(variable);
         const local = readAuthProviderKey(name) !== undefined;
 
         lines.push(
@@ -299,21 +224,20 @@ export class SecretsOperations {
     }
 
     const tracked = new Set(
-      variables.map((variable) =>
-        variable.slice(SECRETS_VARIABLE_PREFIX.length),
-      ),
+      variables.map((variable) => this.providerFromVariable(variable)),
     );
     const untracked = localProviders.filter((name) => !tracked.has(name));
 
     if (untracked.length > 0) {
       lines.push("");
-      lines.push(
-        "Local providers you can add (auth.json, not yet tracked remote):",
-      );
+      lines.push("Local providers that will sync on next /pisync push:");
       lines.push(...untracked.map((name) => `- ${name}`));
     }
 
-    this.notify(lines.join("\n"), "info");
+    this.notify(
+      lines.length > 0 ? lines.join("\n") : "No secrets configured.",
+      "info",
+    );
   }
 
   /**
@@ -342,7 +266,7 @@ export class SecretsOperations {
       if (recipient === undefined) {
         level = "warning";
         messages.push(
-          `age recipient: missing (${AGE_RECIPIENT_VARIABLE}). Run /pisync secrets init.`,
+          `age recipient: missing (${AGE_RECIPIENT_VARIABLE}). Run /pisync secrets setup.`,
         );
       } else {
         messages.push(`age recipient: published (${AGE_RECIPIENT_VARIABLE})`);
@@ -360,17 +284,25 @@ export class SecretsOperations {
 
     try {
       await readRecipient();
-      messages.push(`age identity: present (${ageIdentityPath()})`);
+      messages.push(`age identity: cached (${ageIdentityPath()})`);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        level = "warning";
         messages.push(
-          `age identity: missing. Run /pisync secrets init on a machine that already has it, or copy the shared identity to ${ageIdentityPath()}.`,
+          `age identity: not cached. Run /pisync secrets setup (or /pisync init) to enter your passphrase.`,
         );
       } else {
         level = "warning";
         messages.push(`age identity: ${(error as Error).message}`);
       }
+    }
+
+    const match = await recipientMatchesPublished();
+
+    if (match === false) {
+      level = "warning";
+      messages.push(
+        "recipient mismatch: this machine's passphrase differs from the one published to GitHub. Re-run /pisync secrets setup with the correct passphrase.",
+      );
     }
 
     const localProviders = readAuthApiKeyProviders();
@@ -389,42 +321,29 @@ export class SecretsOperations {
     await ensureAgeCli();
     const config = await loadConfig();
     const repo = requireGithubRepo(config.repository);
-    const remoteRecipient = await getVariable(repo, AGE_RECIPIENT_VARIABLE);
+    const key = await this.resolveKey();
 
-    let recipient: string;
-
-    if (remoteRecipient === undefined) {
-      recipient = await ensureIdentity();
-      await setVariable(repo, AGE_RECIPIENT_VARIABLE, recipient);
-    } else {
-      recipient = remoteRecipient;
-    }
-
-    return { repo, recipient };
+    return { repo, recipient: key.recipient };
   }
 
-  private async prepareRead(): Promise<{ repo: string; config: SyncConfig }> {
+  private async prepareRead(): Promise<{ repo: string }> {
     const config = await loadConfig();
 
-    return { repo: requireGithubRepo(config.repository), config };
+    return { repo: requireGithubRepo(config.repository) };
   }
 
-  private async trackedProviders(repo: string): Promise<string[]> {
-    const variables = await listVariables(repo);
-
-    return variables
-      .filter((entry) => entry.name.startsWith(SECRETS_VARIABLE_PREFIX))
-      .map((entry) => entry.name.slice(SECRETS_VARIABLE_PREFIX.length));
+  private async resolveKey(): Promise<ResolvedKey> {
+    return getOrPromptKey(this.ctx);
   }
 
   private variableName(provider: string): string {
-    return `${SECRETS_VARIABLE_PREFIX}${provider}`;
+    // GitHub repository variables are forced to UPPERCASE; provider names are
+    // restored to lowercase on pull (all Pi provider names are lowercase).
+    return `${SECRETS_VARIABLE_PREFIX}${provider.toUpperCase()}`;
   }
 
-  private localProviderList(): string {
-    const providers = readAuthApiKeyProviders();
-
-    return providers.length > 0 ? providers.join(", ") : "(none)";
+  private providerFromVariable(variable: string): string {
+    return variable.slice(SECRETS_VARIABLE_PREFIX.length).toLowerCase();
   }
 
   private notify(message: string, level: "info" | "warning" | "error"): void {

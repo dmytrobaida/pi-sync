@@ -10,6 +10,7 @@ import { loadConfig } from "../config/config.js";
 import { ACTIVITY_STATUS_KEY } from "../domain/constants.js";
 import type { CommandOptions, Snapshot, SyncConfig } from "../domain/types.js";
 import { GitStore } from "../git/store.js";
+import { SecretsOperations } from "../secrets/operations.js";
 import { applySnapshot } from "../snapshot/apply.js";
 import { formatGitTextDiff } from "../snapshot/diff.js";
 import {
@@ -23,7 +24,9 @@ import {
   sameHashes,
   writeSyncState,
 } from "../state/state.js";
+import { errorMessage } from "../utils/json-utils.js";
 import { agentDir, stateDir } from "../utils/path-utils.js";
+import { isEnabled } from "./args.js";
 import { type SyncInputs, syncInputs } from "./context.js";
 import {
   refreshSyncFooter,
@@ -97,6 +100,7 @@ export class SyncOperations {
     }
 
     await this.pushSnapshot(config, local);
+    await this.maybePushSecrets();
   }
 
   /**
@@ -140,6 +144,7 @@ export class SyncOperations {
     }
 
     await this.applyRemoteSnapshot(config, remote);
+    await this.maybePullSecrets();
   }
 
   /**
@@ -377,6 +382,71 @@ export class SyncOperations {
 
     if (this.ctx.hasUI && confirmed) {
       await this.ctx.reload();
+    }
+  }
+
+  private async isSecretsEnabled(): Promise<boolean> {
+    try {
+      const config = await loadConfig();
+
+      return isEnabled(config.secrets, false);
+    } catch {
+      return false;
+    }
+  }
+
+  private secretsOps(): SecretsOperations {
+    return new SecretsOperations(this.ctx, {
+      yes: this.options.yes,
+      silent: this.options.silent,
+    });
+  }
+
+  /**
+   * After a successful settings push, also publish encrypted provider keys
+   * when the secrets toggle is on. Background sync never pushes, so it is
+   * skipped silently when `silent` is set.
+   */
+  private async maybePushSecrets(): Promise<void> {
+    const enabled = await this.isSecretsEnabled();
+
+    if (!enabled || this.options.silent) {
+      return;
+    }
+
+    try {
+      await this.secretsOps().pushAll();
+    } catch (error) {
+      this.ctx.ui.notify(
+        `Encrypted secrets push skipped: ${errorMessage(error)}`,
+        "warning",
+      );
+    }
+  }
+
+  /**
+   * After a successful settings pull, also decrypt provider keys when the
+   * secrets toggle is on. Interactive pulls may prompt for the passphrase;
+   * background (silent) pulls only run when a key is already cached.
+   */
+  private async maybePullSecrets(): Promise<void> {
+    const enabled = await this.isSecretsEnabled();
+
+    if (!enabled) {
+      return;
+    }
+
+    try {
+      if (this.options.silent) {
+        await this.secretsOps().pullAllIfCached();
+      } else {
+        await this.secretsOps().pullAll();
+      }
+    } catch (error) {
+      this.ctx.ui.notify(
+        `Encrypted secrets pull skipped: ${errorMessage(error)}`,
+        "warning",
+      );
     }
   }
 }
