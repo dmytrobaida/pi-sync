@@ -133,6 +133,7 @@ Environment overrides are also supported: `PI_SYNC_REPOSITORY` (or `PI_SYNC_REPO
 /pisync history
 /pisync checkout <commit-ish>
 /pisync unlock --stale
+/pisync secrets <init|add|remove|push|pull|list|doctor>
 ```
 
 Command guide:
@@ -149,6 +150,7 @@ Command guide:
 | `/pisync history`               | Show recent synced Git commits.                                       |
 | `/pisync checkout <commit-ish>` | Restore a previous commit locally without changing the remote branch. |
 | `/pisync unlock --stale`        | Remove a stale local lock after confirming no sync is running.        |
+| `/pisync secrets <command>`     | Sync API keys as age-encrypted GitHub repository variables.           |
 
 Useful flags:
 
@@ -206,16 +208,84 @@ It excludes `.env*`, `node_modules`, `.git`, `.pisync`, `pi-sync.json`, and path
 - Auto-sync is enabled by default but never pushes local changes automatically; it only pulls safe remote changes or asks you to resolve conflicts manually.
 - Secret scanning is best-effort. Do not intentionally store API keys or tokens in synced Pi config.
 
+## Encrypted secrets (optional)
+
+`/pisync secrets` syncs API keys and other sensitive values **without ever putting plaintext in your Git repo**. Values are encrypted locally with [age](https://age-encryption.org) and stored as **GitHub repository Variables** (`PISYNC_SECRET_*`). Only the encrypted ciphertext ever touches GitHub; the age identity (private key) stays local.
+
+This is independent of the normal Git sync: `.env` is already excluded from synced snapshots, so secrets are never committed. Encrypted secrets live entirely in GitHub Variables and round-trip through the local `~/.pi/agent/.env`.
+
+### Prerequisites
+
+- A **GitHub** repository (HTTPS or SSH URL) configured via `/pisync init`.
+- [GitHub CLI](https://cli.github.com) (`gh`) installed and authenticated with `repo` scope.
+- [age](https://age-encryption.org) installed: macOS `brew install age`, Windows `scoop install age` / `winget install FiloSottile.age`, Linux `sudo apt install age`.
+
+### How it works
+
+- Each machine shares the **same** age identity file (`~/.pi/agent/.pisync/age-identity.txt`). Copy it to every machine; it is never synced.
+- The age recipient (public key) is published to a GitHub Variable `PISYNC_AGE_RECIPIENT` so every machine encrypts to the same key.
+- A secret named `ANTHROPIC_API_KEY` is encrypted and stored in GitHub Variable `PISYNC_SECRET_ANTHROPIC_API_KEY`, and read from / written to the `ANTHROPIC_API_KEY` key in `~/.pi/agent/.env`.
+
+### Quick start
+
+1. Install `age` and ensure `gh auth login` works for your repository.
+2. Set the value locally once:
+
+   ```bash
+   echo 'ANTHROPIC_API_KEY=sk-ant-...' >> ~/.pi/agent/.env
+   ```
+
+3. Initialize the age identity and publish its recipient:
+
+   ```text
+   /pisync secrets init
+   ```
+
+4. Track and encrypt the key:
+
+   ```text
+   /pisync secrets add ANTHROPIC_API_KEY
+   ```
+
+5. On another machine (after copying the same age identity into `~/.pi/agent/.pisync/age-identity.txt`):
+
+   ```text
+   /pisync secrets pull
+   ```
+
+   This decrypts every tracked secret back into `~/.pi/agent/.env` (a backup of the previous `.env` is created under `~/.pi/agent/.pisync/secrets-backups/` first).
+
+### Commands
+
+| Command                         | Use it when                                                       |
+| ------------------------------- | ----------------------------------------------------------------- |
+| `/pisync secrets init`          | Generate/load the local age identity and publish its recipient.   |
+| `/pisync secrets add <NAME>`    | Encrypt one `.env` key and store it as a GitHub variable.         |
+| `/pisync secrets remove <NAME>` | Delete a tracked secret variable.                                 |
+| `/pisync secrets push`          | Re-encrypt and refresh every tracked secret from local `.env`.    |
+| `/pisync secrets pull`          | Decrypt every tracked secret into local `.env` (backed up first). |
+| `/pisync secrets list`          | Show tracked secret names and local/remote presence.              |
+| `/pisync secrets doctor`        | Diagnose age, gh, identity, and recipient setup.                  |
+
+### Security notes
+
+- GitHub Variables are visible to anyone with repository access — but only as **ciphertext**.
+- The age identity is the single secret that protects everything. Keep it private and off the repo.
+- GitHub repository **Secrets** (`gh secret`) are write-only and cannot be read back, so they are intentionally **not** used here; round-trip sync needs readable storage, which age-encrypted Variables provide safely.
+- Values are limited to GitHub's repository-variable size cap (48 KB); API keys are far smaller.
+
 ## Troubleshooting
 
-| Symptom                                        | Likely cause                                            | Suggested fix                                                                                                                   |
-| ---------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `/pisync doctor` says repository access failed | Git auth is not configured for the repo URL             | For GitHub HTTPS, run `gh auth login` and `gh auth setup-git`. For SSH, run `ssh -T git@github.com` and configure your SSH key. |
-| `Permission denied (publickey)`                | SSH repository URL without working SSH key setup        | Use an HTTPS repository URL, or add/load an SSH key registered with GitHub.                                                     |
-| `gh: command not found`                        | GitHub CLI is not installed                             | Install it with `brew install gh`, then run `gh auth login` and `gh auth setup-git`.                                            |
-| Footer shows `PI-SYNC: ↑1 ↓0`                  | Local config differs from the last synced state         | Run `/pisync diff`, then `/pisync push` if you want to publish local changes.                                                   |
-| Footer shows `PI-SYNC: ↑0 ↓1`                  | Remote config changed                                   | Run `/pisync pull`.                                                                                                             |
-| Footer shows both local and remote changes     | Local and remote diverged                               | Run `/pisync diff`, then choose `/pisync pull --force` or `/pisync push --force`.                                               |
-| Push is refused due to possible secrets        | A synced file path or content matched secret heuristics | Remove the secret/token from synced config or rename/exclude the sensitive file.                                                |
-| A lock is stale                                | A previous sync was interrupted                         | After verifying no sync is running, run `/pisync unlock --stale`.                                                               |
-| Checkout restored older local files            | `/pisync checkout` is local-only by design              | Run `/pisync pull` to return to remote latest, or `/pisync push` to publish the checked-out state.                              |
+| Symptom                                        | Likely cause                                               | Suggested fix                                                                                                                   |
+| ---------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `/pisync doctor` says repository access failed | Git auth is not configured for the repo URL                | For GitHub HTTPS, run `gh auth login` and `gh auth setup-git`. For SSH, run `ssh -T git@github.com` and configure your SSH key. |
+| `Permission denied (publickey)`                | SSH repository URL without working SSH key setup           | Use an HTTPS repository URL, or add/load an SSH key registered with GitHub.                                                     |
+| `gh: command not found`                        | GitHub CLI is not installed                                | Install it with `brew install gh`, then run `gh auth login` and `gh auth setup-git`.                                            |
+| Footer shows `PI-SYNC: ↑1 ↓0`                  | Local config differs from the last synced state            | Run `/pisync diff`, then `/pisync push` if you want to publish local changes.                                                   |
+| Footer shows `PI-SYNC: ↑0 ↓1`                  | Remote config changed                                      | Run `/pisync pull`.                                                                                                             |
+| Footer shows both local and remote changes     | Local and remote diverged                                  | Run `/pisync diff`, then choose `/pisync pull --force` or `/pisync push --force`.                                               |
+| Push is refused due to possible secrets        | A synced file path or content matched secret heuristics    | Remove the secret/token from synced config or rename/exclude the sensitive file.                                                |
+| A lock is stale                                | A previous sync was interrupted                            | After verifying no sync is running, run `/pisync unlock --stale`.                                                               |
+| Checkout restored older local files            | `/pisync checkout` is local-only by design                 | Run `/pisync pull` to return to remote latest, or `/pisync push` to publish the checked-out state.                              |
+| `/pisync secrets` says age/gh not found        | Required tooling is missing                                | Install `age` (see Encrypted secrets) and `gh` (`brew install gh`), then run `/pisync secrets doctor`.                          |
+| `/pisync secrets pull` cannot decrypt          | The local age identity differs from the one that encrypted | Copy the shared `~/.pi/agent/.pisync/age-identity.txt` from the machine that ran `/pisync secrets init`.                        |

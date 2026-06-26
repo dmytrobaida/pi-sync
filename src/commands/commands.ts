@@ -36,6 +36,7 @@ import { syncInputs } from "./context.js";
 import { setSyncFooter, syncDrift } from "./footer-status.js";
 import { initConfig } from "./init.js";
 import { SyncOperations } from "./operations.js";
+import { handleSecretsCommand } from "./secrets.js";
 
 /**
  * Parse and execute a /pisync command invocation.
@@ -119,6 +120,10 @@ async function runCommand(
       return;
     case "unlock":
       await unlock(ctx, options);
+
+      return;
+    case "secrets":
+      await handleSecretsCommand(options, ctx);
 
       return;
     default:
