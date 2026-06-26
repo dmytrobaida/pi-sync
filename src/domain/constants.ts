@@ -29,6 +29,9 @@ export const SECRET_PATTERNS = [
   /gh[pousr]_[A-Za-z0-9_]{20,}/,
 ];
 
+export const SECRETS_VARIABLE_PREFIX = "PISYNC_SECRET_";
+export const AGE_RECIPIENT_VARIABLE = "PISYNC_AGE_RECIPIENT";
+
 export const AUTO_SYNC_OPTIONS: CommandOptions = {
   yes: true,
   force: false,

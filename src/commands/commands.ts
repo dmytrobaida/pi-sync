@@ -36,6 +36,7 @@ import { syncInputs } from "./context.js";
 import { setSyncFooter, syncDrift } from "./footer-status.js";
 import { initConfig } from "./init.js";
 import { SyncOperations } from "./operations.js";
+import { handleSecretsCommand } from "./secrets.js";
 
 /**
  * Parse and execute a /pisync command invocation.
@@ -121,6 +122,10 @@ async function runCommand(
       await unlock(ctx, options);
 
       return;
+    case "secrets":
+      await handleSecretsCommand(options, ctx);
+
+      return;
     default:
       ctx.ui.notify(
         `Unknown /pisync command: ${subcommand}\n\n${usage()}`,
@@ -138,6 +143,7 @@ async function showConfig(ctx: ExtensionCommandContext): Promise<void> {
       `repository: ${partial.repository ?? "missing"}`,
       `branch: ${partial.branch ?? DEFAULT_BRANCH}`,
       `autoSync: ${isEnabled(partial.autoSync ?? process.env.PI_SYNC_AUTO_SYNC, true) ? "enabled" : "disabled"}`,
+      `secrets: ${isEnabled(partial.secrets ?? process.env.PI_SYNC_SECRETS, false) ? "enabled" : "disabled"}`,
       `local config: ${localConfigPath()}`,
       `local clone: ${repoDir()}`,
     ].join("\n"),

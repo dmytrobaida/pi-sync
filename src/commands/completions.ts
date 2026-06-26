@@ -86,6 +86,46 @@ const SUBCOMMAND_COMPLETIONS: SubcommandCompletion[] = [
       "Remove a stale local pi-sync lock after verifying no sync is running.",
     keywords: ["lock", "stale"],
   },
+  {
+    value: "secrets",
+    label: "secrets <command>",
+    description: "Sync API keys as age-encrypted GitHub repository variables.",
+    keywords: ["api", "keys", "tokens", "encrypted", "age", "variables"],
+  },
+];
+
+const SECRETS_SUBCOMMAND_COMPLETIONS: SubcommandCompletion[] = [
+  {
+    value: "setup",
+    label: "setup",
+    description:
+      "Enter your passphrase once, derive and cache the local secrets key.",
+    keywords: ["init", "passphrase", "age", "key", "enable"],
+  },
+  {
+    value: "push",
+    label: "push",
+    description: "Encrypt and publish every auth.json provider key now.",
+    keywords: ["upload", "refresh"],
+  },
+  {
+    value: "pull",
+    label: "pull",
+    description: "Decrypt every provider key into auth.json (backed up first).",
+    keywords: ["download", "restore"],
+  },
+  {
+    value: "list",
+    label: "list",
+    description: "Show tracked providers and local/remote presence.",
+    keywords: ["show", "status"],
+  },
+  {
+    value: "doctor",
+    label: "doctor",
+    description: "Diagnose age, gh, identity, and recipient setup.",
+    keywords: ["check", "diagnostics"],
+  },
 ];
 
 /**
@@ -96,6 +136,16 @@ const SUBCOMMAND_COMPLETIONS: SubcommandCompletion[] = [
 export function completePisyncArguments(
   argumentPrefix: string,
 ): AutocompleteItem[] | null {
+  const trimmedStart = argumentPrefix.trimStart();
+
+  if (trimmedStart.startsWith("secrets")) {
+    const afterSecrets = trimmedStart.slice("secrets".length);
+
+    if (afterSecrets.startsWith(" ") || afterSecrets === "") {
+      return completeSecretsSubcommand(afterSecrets.trimStart());
+    }
+  }
+
   const token = firstArgumentToken(argumentPrefix);
 
   if (token == null) {
@@ -104,6 +154,19 @@ export function completePisyncArguments(
 
   const normalized = token.toLowerCase();
   const matches = SUBCOMMAND_COMPLETIONS.filter((item) =>
+    matchesSubcommand(item, normalized),
+  )
+    .slice(0, MAX_COMPLETIONS)
+    .map(toAutocompleteItem);
+
+  return matches.length > 0 ? matches : null;
+}
+
+function completeSecretsSubcommand(
+  argumentPrefix: string,
+): AutocompleteItem[] | null {
+  const normalized = argumentPrefix.toLowerCase();
+  const matches = SECRETS_SUBCOMMAND_COMPLETIONS.filter((item) =>
     matchesSubcommand(item, normalized),
   )
     .slice(0, MAX_COMPLETIONS)

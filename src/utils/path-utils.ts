@@ -87,6 +87,34 @@ export function lockPath(): string {
   return path.join(stateDir(), "lock");
 }
 
+/**
+ * Return the Pi agent .env file path used as the local secret store.
+ */
+export function agentEnvPath(): string {
+  return path.join(agentDir(), ".env");
+}
+
+/**
+ * Return the Pi agent auth.json path where provider API keys are stored.
+ */
+export function authJsonPath(): string {
+  return path.join(agentDir(), "auth.json");
+}
+
+/**
+ * Return the local age identity file path (never synced, keep private).
+ */
+export function ageIdentityPath(): string {
+  return path.join(stateDir(), "age-identity.txt");
+}
+
+/**
+ * Return the directory used to back up local secrets state before pull.
+ */
+export function secretsBackupDir(): string {
+  return path.join(stateDir(), "secrets-backups");
+}
+
 function assertWithinRoot(root: string, target: string, label = target): void {
   const resolvedRoot = path.resolve(root);
   const resolvedTarget = path.resolve(target);
