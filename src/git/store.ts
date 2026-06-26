@@ -54,26 +54,68 @@ export class GitStore {
 
     const remoteBranchExists = await this.remoteBranchExists();
 
-    if (remoteBranchExists) {
-      await this.run(["fetch", "origin", this.config.branch]);
-      await this.run([
-        "checkout",
-        "-B",
-        this.config.branch,
-        `origin/${this.config.branch}`,
-      ]);
-      await this.run([
-        "pull",
-        "--no-rebase",
-        "--ff-only",
-        "origin",
-        this.config.branch,
-      ]);
+    if (!remoteBranchExists) {
+      await this.run(["checkout", "-B", this.config.branch]);
 
       return;
     }
 
-    await this.run(["checkout", "-B", this.config.branch]);
+    await this.run(["fetch", "origin", this.config.branch]);
+
+    // Skip the `checkout -B` + `pull` pair when the local branch already
+    // tracks `origin/<branch>` and HEAD matches it. `checkout -B` would
+    // unconditionally rewrite `.git/config` to set upstream tracking, which
+    // races with transient Windows file locks (antivirus, indexer) and adds
+    // pointless work on every operation since `prepare()` runs on each call.
+    const inSync = await this.isBranchInSyncWithOrigin();
+
+    if (inSync) {
+      return;
+    }
+
+    await this.run([
+      "checkout",
+      "-B",
+      this.config.branch,
+      `origin/${this.config.branch}`,
+    ]);
+    await this.run([
+      "pull",
+      "--no-rebase",
+      "--ff-only",
+      "origin",
+      this.config.branch,
+    ]);
+  }
+
+  /**
+   * Return true when the configured local branch tracks
+   * `origin/<branch>` and HEAD matches the remote tracking branch.
+   */
+  private async isBranchInSyncWithOrigin(): Promise<boolean> {
+    try {
+      const upstream = (
+        await this.run([
+          "rev-parse",
+          "--abbrev-ref",
+          "--verify",
+          `${this.config.branch}@{u}`,
+        ])
+      ).trim();
+
+      if (upstream !== `origin/${this.config.branch}`) {
+        return false;
+      }
+
+      const [head, remoteHead] = await Promise.all([
+        this.run(["rev-parse", "--verify", "HEAD"]),
+        this.run(["rev-parse", "--verify", `origin/${this.config.branch}`]),
+      ]);
+
+      return head.trim() === remoteHead.trim();
+    } catch {
+      return false;
+    }
   }
 
   /**
