@@ -104,27 +104,29 @@ const SECRETS_SUBCOMMAND_COMPLETIONS: SubcommandCompletion[] = [
   },
   {
     value: "add",
-    label: "add <NAME>",
-    description: "Encrypt one .env key and store it as a GitHub variable.",
-    keywords: ["create", "upload", "track"],
+    label: "add <PROVIDER>",
+    description:
+      "Encrypt one auth.json provider key and store it as a GitHub variable.",
+    keywords: ["create", "upload", "track", "api", "key"],
   },
   {
     value: "remove",
-    label: "remove <NAME>",
-    description: "Delete a tracked secret variable.",
+    label: "remove <PROVIDER>",
+    description: "Delete a tracked provider secret variable.",
     keywords: ["delete", "untrack"],
   },
   {
     value: "push",
     label: "push",
-    description: "Re-encrypt and update every tracked secret from local .env.",
+    description:
+      "Re-encrypt and update every tracked provider key from auth.json.",
     keywords: ["upload", "refresh"],
   },
   {
     value: "pull",
     label: "pull",
     description:
-      "Decrypt every tracked secret into local .env (backed up first).",
+      "Decrypt every tracked provider key into auth.json (backed up first).",
     keywords: ["download", "restore"],
   },
   {

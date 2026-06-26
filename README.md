@@ -150,7 +150,7 @@ Command guide:
 | `/pisync history`               | Show recent synced Git commits.                                       |
 | `/pisync checkout <commit-ish>` | Restore a previous commit locally without changing the remote branch. |
 | `/pisync unlock --stale`        | Remove a stale local lock after confirming no sync is running.        |
-| `/pisync secrets <command>`     | Sync API keys as age-encrypted GitHub repository variables.           |
+| `/pisync secrets <command>`     | Sync auth.json provider API keys as age-encrypted GitHub variables.   |
 
 Useful flags:
 
@@ -212,7 +212,7 @@ It excludes `.env*`, `node_modules`, `.git`, `.pisync`, `pi-sync.json`, and path
 
 `/pisync secrets` syncs API keys and other sensitive values **without ever putting plaintext in your Git repo**. Values are encrypted locally with [age](https://age-encryption.org) and stored as **GitHub repository Variables** (`PISYNC_SECRET_*`). Only the encrypted ciphertext ever touches GitHub; the age identity (private key) stays local.
 
-This is independent of the normal Git sync: `.env` is already excluded from synced snapshots, so secrets are never committed. Encrypted secrets live entirely in GitHub Variables and round-trip through the local `~/.pi/agent/.env`.
+This is independent of the normal Git sync: `auth.json` is not part of the synced snapshot, so provider keys are never committed. Encrypted secrets live entirely in GitHub Variables and round-trip through the provider entries in `~/.pi/agent/auth.json` — exactly where Pi reads them.
 
 ### Prerequisites
 
@@ -224,27 +224,22 @@ This is independent of the normal Git sync: `.env` is already excluded from sync
 
 - Each machine shares the **same** age identity file (`~/.pi/agent/.pisync/age-identity.txt`). Copy it to every machine; it is never synced.
 - The age recipient (public key) is published to a GitHub Variable `PISYNC_AGE_RECIPIENT` so every machine encrypts to the same key.
-- A secret named `ANTHROPIC_API_KEY` is encrypted and stored in GitHub Variable `PISYNC_SECRET_ANTHROPIC_API_KEY`, and read from / written to the `ANTHROPIC_API_KEY` key in `~/.pi/agent/.env`.
+- A provider key (e.g. `zai`, `xai`) is encrypted and stored in GitHub Variable `PISYNC_SECRET_<provider>`, and read from / written to the matching entry in `~/.pi/agent/auth.json` (the `{ type: "api_key", key: "..." }` entries Pi already uses for provider auth).
 
 ### Quick start
 
 1. Install `age` and ensure `gh auth login` works for your repository.
-2. Set the value locally once:
-
-   ```bash
-   echo 'ANTHROPIC_API_KEY=sk-ant-...' >> ~/.pi/agent/.env
-   ```
-
+2. Make sure the provider key already works locally (it already lives in `~/.pi/agent/auth.json`, e.g. added via `/login` or `pi auth`). For example, provider `zai` has `{ type: "api_key", key: "..." }`.
 3. Initialize the age identity and publish its recipient:
 
    ```text
    /pisync secrets init
    ```
 
-4. Track and encrypt the key:
+4. Track and encrypt the provider key:
 
    ```text
-   /pisync secrets add ANTHROPIC_API_KEY
+   /pisync secrets add zai
    ```
 
 5. On another machine (after copying the same age identity into `~/.pi/agent/.pisync/age-identity.txt`):
@@ -253,19 +248,19 @@ This is independent of the normal Git sync: `.env` is already excluded from sync
    /pisync secrets pull
    ```
 
-   This decrypts every tracked secret back into `~/.pi/agent/.env` (a backup of the previous `.env` is created under `~/.pi/agent/.pisync/secrets-backups/` first).
+   This decrypts every tracked provider key back into `~/.pi/agent/auth.json` (a backup of the previous `auth.json` is created under `~/.pi/agent/.pisync/secrets-backups/` first). Run `/pisync secrets list` to see which providers are tracked and which local ones you can still add.
 
 ### Commands
 
-| Command                         | Use it when                                                       |
-| ------------------------------- | ----------------------------------------------------------------- |
-| `/pisync secrets init`          | Generate/load the local age identity and publish its recipient.   |
-| `/pisync secrets add <NAME>`    | Encrypt one `.env` key and store it as a GitHub variable.         |
-| `/pisync secrets remove <NAME>` | Delete a tracked secret variable.                                 |
-| `/pisync secrets push`          | Re-encrypt and refresh every tracked secret from local `.env`.    |
-| `/pisync secrets pull`          | Decrypt every tracked secret into local `.env` (backed up first). |
-| `/pisync secrets list`          | Show tracked secret names and local/remote presence.              |
-| `/pisync secrets doctor`        | Diagnose age, gh, identity, and recipient setup.                  |
+| Command                             | Use it when                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------- |
+| `/pisync secrets init`              | Generate/load the local age identity and publish its recipient.           |
+| `/pisync secrets add <PROVIDER>`    | Encrypt one `auth.json` provider key and store it as a GitHub variable.   |
+| `/pisync secrets remove <PROVIDER>` | Delete a tracked provider secret variable.                                |
+| `/pisync secrets push`              | Re-encrypt and refresh every tracked provider key from local `auth.json`. |
+| `/pisync secrets pull`              | Decrypt every tracked provider key into `auth.json` (backed up first).    |
+| `/pisync secrets list`              | Show tracked providers, local/remote presence, and addable local keys.    |
+| `/pisync secrets doctor`            | Diagnose age, gh, identity, recipient, and local providers.               |
 
 ### Security notes
 
@@ -288,4 +283,5 @@ This is independent of the normal Git sync: `.env` is already excluded from sync
 | A lock is stale                                | A previous sync was interrupted                            | After verifying no sync is running, run `/pisync unlock --stale`.                                                               |
 | Checkout restored older local files            | `/pisync checkout` is local-only by design                 | Run `/pisync pull` to return to remote latest, or `/pisync push` to publish the checked-out state.                              |
 | `/pisync secrets` says age/gh not found        | Required tooling is missing                                | Install `age` (see Encrypted secrets) and `gh` (`brew install gh`), then run `/pisync secrets doctor`.                          |
+| `/pisync secrets add <PROVIDER>` says no entry | Provider has no `api_key` entry in `auth.json`             | Run `/pisync secrets list` to see local providers, or add the key via `/login` first.                                           |
 | `/pisync secrets pull` cannot decrypt          | The local age identity differs from the one that encrypted | Copy the shared `~/.pi/agent/.pisync/age-identity.txt` from the machine that ran `/pisync secrets init`.                        |

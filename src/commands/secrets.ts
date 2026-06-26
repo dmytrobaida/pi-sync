@@ -101,7 +101,7 @@ async function runNameAction(
 
   if (name === "") {
     ctx.ui.notify(
-      `Usage: /pisync secrets ${kind} <NAME>\n<NAME> is an env key present in ~/.pi/agent/.env.`,
+      `Usage: /pisync secrets ${kind} <PROVIDER>\n<PROVIDER> is an auth.json provider with type "api_key" (e.g. zai, xai).`,
       "warning",
     );
 
@@ -123,8 +123,8 @@ async function runNameAction(
 export function secretsUsage(): string {
   return [
     "Usage: /pisync secrets <command>",
-    "Commands: init, add <NAME>, remove <NAME>, push, pull, list, doctor",
-    "Values are read from and written to ~/.pi/agent/.env.",
+    "Commands: init, add <PROVIDER>, remove <PROVIDER>, push, pull, list, doctor",
+    "Provider keys are read from and written to ~/.pi/agent/auth.json (type: api_key).",
     "Encrypted with age and stored as GitHub repository variables (PISYNC_SECRET_*).",
   ].join("\n");
 }

@@ -95,6 +95,13 @@ export function agentEnvPath(): string {
 }
 
 /**
+ * Return the Pi agent auth.json path where provider API keys are stored.
+ */
+export function authJsonPath(): string {
+  return path.join(agentDir(), "auth.json");
+}
+
+/**
  * Return the local age identity file path (never synced, keep private).
  */
 export function ageIdentityPath(): string {

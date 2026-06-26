@@ -15,7 +15,7 @@ import {
 import type { SyncConfig } from "../domain/types.js";
 import {
   ageIdentityPath,
-  agentEnvPath,
+  authJsonPath,
   secretsBackupDir,
 } from "../utils/path-utils.js";
 import {
@@ -25,7 +25,11 @@ import {
   ensureIdentity,
   readRecipient,
 } from "./age.js";
-import { readDotenvKey, writeDotenvKey } from "./dotenv.js";
+import {
+  readAuthApiKeyProviders,
+  readAuthProviderKey,
+  writeAuthProviderKey,
+} from "./auth-storage.js";
 import {
   deleteVariable,
   getVariable,
@@ -41,7 +45,8 @@ type SecretsSettings = {
 };
 
 /**
- * Coordinate encrypted-secret sync between the local .env and GitHub Variables.
+ * Coordinate encrypted-secret sync between local auth.json provider keys and
+ * age-encrypted GitHub repository Variables.
  */
 export class SecretsOperations {
   /**
@@ -77,43 +82,46 @@ export class SecretsOperations {
         `age recipient: ${recipient}`,
         `local identity: ${identityPath} (private — install the same file on every machine, never sync it)`,
         `recipient stored in GitHub variable: ${AGE_RECIPIENT_VARIABLE}`,
-        "Add a secret with /pisync secrets add <NAME>.",
+        `Add a provider key with /pisync secrets add <PROVIDER> (e.g. zai, xai).`,
       ].join("\n"),
       "info",
     );
   }
 
   /**
-   * Encrypt one local .env key and store it as a GitHub variable.
+   * Encrypt one local auth.json provider key and store it as a GitHub variable.
    *
-   * @param name Secret name (env key).
+   * @param provider Provider name (e.g. "zai", "xai").
    */
-  async add(name: string): Promise<void> {
+  async add(provider: string): Promise<void> {
     const { repo, recipient } = await this.prepareWrite();
-    const value = await readDotenvKey(name);
+    const value = readAuthProviderKey(provider);
 
     if (value === undefined) {
       throw new Error(
-        `No local value found for ${name} in ~/.pi/agent/.env. Set it there first.`,
+        `No api_key entry for provider "${provider}" in ~/.pi/agent/auth.json. Local providers: ${this.localProviderList()}.`,
       );
     }
 
     const ciphertext = await encryptForRecipient(recipient, value);
-    const variable = this.variableName(name);
+    const variable = this.variableName(provider);
 
     await setVariable(repo, variable, ciphertext);
 
-    this.notify(`Encrypted and stored secret ${name} (${variable}).`, "info");
+    this.notify(
+      `Encrypted and stored provider key ${provider} (${variable}).`,
+      "info",
+    );
   }
 
   /**
-   * Remove a tracked secret variable.
+   * Remove a tracked provider secret variable.
    *
-   * @param name Secret name (env key).
+   * @param provider Provider name.
    */
-  async remove(name: string): Promise<void> {
+  async remove(provider: string): Promise<void> {
     const { repo } = await this.prepareRead();
-    const variable = this.variableName(name);
+    const variable = this.variableName(provider);
     const removed = await deleteVariable(repo, variable);
 
     this.notify(
@@ -125,15 +133,15 @@ export class SecretsOperations {
   }
 
   /**
-   * Re-encrypt every tracked secret from local .env and update the variables.
+   * Re-encrypt every tracked provider key from local auth.json and refresh it.
    */
   async push(): Promise<void> {
     const { repo, recipient } = await this.prepareWrite();
-    const tracked = await this.trackedNames(repo);
+    const tracked = await this.trackedProviders(repo);
 
     if (tracked.length === 0) {
       this.notify(
-        "No tracked secrets. Use /pisync secrets add <NAME> first.",
+        "No tracked secrets. Use /pisync secrets add <PROVIDER> first.",
         "warning",
       );
 
@@ -143,7 +151,7 @@ export class SecretsOperations {
     const confirmed = this.settings.yes
       ? true
       : await this.ctx.ui.confirm(
-          `Push ${tracked.length} encrypted secret(s)?`,
+          `Push ${tracked.length} encrypted provider key(s)?`,
           tracked.map((name) => `- ${name}`).join("\n"),
         );
 
@@ -155,27 +163,27 @@ export class SecretsOperations {
 
     const missing: string[] = [];
 
-    for (const name of tracked) {
-      const value = await readDotenvKey(name);
+    for (const provider of tracked) {
+      const value = readAuthProviderKey(provider);
 
       if (value === undefined) {
-        missing.push(name);
+        missing.push(provider);
 
         continue;
       }
 
       const ciphertext = await encryptForRecipient(recipient, value);
 
-      await setVariable(repo, this.variableName(name), ciphertext);
+      await setVariable(repo, this.variableName(provider), ciphertext);
     }
 
     const pushed = tracked.length - missing.length;
 
     this.notify(
       [
-        `Pushed ${pushed} encrypted secret(s).`,
+        `Pushed ${pushed} encrypted provider key(s).`,
         ...(missing.length > 0
-          ? [`Skipped (not in local .env): ${missing.join(", ")}`]
+          ? [`Skipped (not in local auth.json): ${missing.join(", ")}`]
           : []),
       ].join("\n"),
       missing.length > 0 ? "warning" : "info",
@@ -183,7 +191,7 @@ export class SecretsOperations {
   }
 
   /**
-   * Decrypt every tracked secret into the local .env file after a backup.
+   * Decrypt every tracked provider key into local auth.json after a backup.
    */
   async pull(): Promise<void> {
     const { repo } = await this.prepareRead();
@@ -193,22 +201,22 @@ export class SecretsOperations {
 
     if (variables.length === 0) {
       this.notify(
-        "No secret variables found. Use /pisync secrets add <NAME> on a machine that has the values.",
+        "No secret variables found. Use /pisync secrets add <PROVIDER> on a machine that has the keys.",
         "warning",
       );
 
       return;
     }
 
-    const names = variables.map((variable) =>
+    const providers = variables.map((variable) =>
       variable.slice(SECRETS_VARIABLE_PREFIX.length),
     );
 
     const confirmed = this.settings.yes
       ? true
       : await this.ctx.ui.confirm(
-          `Pull ${names.length} encrypted secret(s) into ~/.pi/agent/.env?`,
-          `A backup of the current .env is created first.\n${names.map((name) => `- ${name}`).join("\n")}`,
+          `Pull ${providers.length} encrypted provider key(s) into ~/.pi/agent/auth.json?`,
+          `A backup of auth.json is created first.\n${providers.map((name) => `- ${name}`).join("\n")}`,
         );
 
     if (!confirmed) {
@@ -217,7 +225,7 @@ export class SecretsOperations {
       return;
     }
 
-    const backup = await backupDotenv();
+    const backup = await backupAuthJson();
     const failures: string[] = [];
 
     for (const variable of variables) {
@@ -230,7 +238,7 @@ export class SecretsOperations {
       try {
         const plaintext = await decryptWithIdentity(ciphertext);
 
-        await writeDotenvKey(
+        writeAuthProviderKey(
           variable.slice(SECRETS_VARIABLE_PREFIX.length),
           plaintext,
         );
@@ -243,7 +251,7 @@ export class SecretsOperations {
 
     this.notify(
       [
-        `Pulled ${names.length - failures.length} secret(s) into ~/.pi/agent/.env.`,
+        `Pulled ${providers.length - failures.length} provider key(s) into ~/.pi/agent/auth.json.`,
         `Backup: ${backup}`,
         ...(failures.length > 0
           ? [`Failed to decrypt: ${failures.join(", ")}`]
@@ -254,29 +262,55 @@ export class SecretsOperations {
   }
 
   /**
-   * Show tracked secret names and their local/remote presence.
+   * Show tracked provider secrets, their remote/local presence, and which local
+   * providers are available to add.
    */
   async list(): Promise<void> {
     const { repo } = await this.prepareRead();
     const variables = (await listVariables(repo))
       .filter((entry) => entry.name.startsWith(SECRETS_VARIABLE_PREFIX))
       .map((entry) => entry.name);
+    const localProviders = readAuthApiKeyProviders();
 
-    if (variables.length === 0) {
-      this.notify("No encrypted secrets are tracked yet.", "info");
+    if (variables.length === 0 && localProviders.length === 0) {
+      this.notify(
+        "No encrypted secrets tracked and no local api_key providers in auth.json.",
+        "info",
+      );
 
       return;
     }
 
-    const lines: string[] = ["Tracked encrypted secrets:"];
+    const lines: string[] = [];
 
-    for (const variable of variables) {
-      const name = variable.slice(SECRETS_VARIABLE_PREFIX.length);
-      const local = (await readDotenvKey(name)) !== undefined;
+    if (variables.length > 0) {
+      lines.push("Tracked encrypted secrets:");
 
+      for (const variable of variables) {
+        const name = variable.slice(SECRETS_VARIABLE_PREFIX.length);
+        const local = readAuthProviderKey(name) !== undefined;
+
+        lines.push(
+          `- ${name} (remote: yes, local auth.json: ${local ? "yes" : "no"})`,
+        );
+      }
+    } else {
+      lines.push("Tracked encrypted secrets: none yet.");
+    }
+
+    const tracked = new Set(
+      variables.map((variable) =>
+        variable.slice(SECRETS_VARIABLE_PREFIX.length),
+      ),
+    );
+    const untracked = localProviders.filter((name) => !tracked.has(name));
+
+    if (untracked.length > 0) {
+      lines.push("");
       lines.push(
-        `- ${name} (remote: yes, local .env: ${local ? "yes" : "no"})`,
+        "Local providers you can add (auth.json, not yet tracked remote):",
       );
+      lines.push(...untracked.map((name) => `- ${name}`));
     }
 
     this.notify(lines.join("\n"), "info");
@@ -339,6 +373,12 @@ export class SecretsOperations {
       }
     }
 
+    const localProviders = readAuthApiKeyProviders();
+
+    messages.push(
+      `local auth.json api_key providers: ${localProviders.length > 0 ? localProviders.join(", ") : "none"}`,
+    );
+
     this.ctx.ui.notify(messages.join("\n"), level);
   }
 
@@ -369,7 +409,7 @@ export class SecretsOperations {
     return { repo: requireGithubRepo(config.repository), config };
   }
 
-  private async trackedNames(repo: string): Promise<string[]> {
+  private async trackedProviders(repo: string): Promise<string[]> {
     const variables = await listVariables(repo);
 
     return variables
@@ -377,8 +417,14 @@ export class SecretsOperations {
       .map((entry) => entry.name.slice(SECRETS_VARIABLE_PREFIX.length));
   }
 
-  private variableName(name: string): string {
-    return `${SECRETS_VARIABLE_PREFIX}${name}`;
+  private variableName(provider: string): string {
+    return `${SECRETS_VARIABLE_PREFIX}${provider}`;
+  }
+
+  private localProviderList(): string {
+    const providers = readAuthApiKeyProviders();
+
+    return providers.length > 0 ? providers.join(", ") : "(none)";
   }
 
   private notify(message: string, level: "info" | "warning" | "error"): void {
@@ -390,8 +436,13 @@ export class SecretsOperations {
   }
 }
 
-async function backupDotenv(): Promise<string> {
-  const source = agentEnvPath();
+/**
+ * Copy auth.json into the pi-sync secrets backup directory before a pull.
+ *
+ * @returns The backup file path.
+ */
+export async function backupAuthJson(): Promise<string> {
+  const source = authJsonPath();
   const dir = secretsBackupDir();
 
   await fs.mkdir(dir, { recursive: true });
@@ -401,7 +452,7 @@ async function backupDotenv(): Promise<string> {
     .update(`${stamp}-${source}`)
     .digest("hex")
     .slice(0, 8);
-  const backup = path.join(dir, `${stamp}-${digest}.env`);
+  const backup = path.join(dir, `${stamp}-${digest}.auth.json`);
 
   try {
     await fs.copyFile(source, backup);
@@ -410,7 +461,13 @@ async function backupDotenv(): Promise<string> {
       throw error;
     }
 
-    await fs.writeFile(backup, "");
+    await fs.writeFile(backup, "{}\n");
+  }
+
+  try {
+    await fs.chmod(backup, 0o600);
+  } catch {
+    // Permissions are best-effort.
   }
 
   return backup;
