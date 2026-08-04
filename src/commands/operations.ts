@@ -12,6 +12,7 @@ import type { CommandOptions, Snapshot, SyncConfig } from "../domain/types.js";
 import { GitStore } from "../git/store.js";
 import { applySnapshot } from "../snapshot/apply.js";
 import { formatGitTextDiff } from "../snapshot/diff.js";
+import { formatDiffSummary } from "../snapshot/parse-diff.js";
 import {
   createSnapshot,
   fileHashMap,
@@ -129,7 +130,10 @@ export class SyncOperations {
 
     const confirmed = this.options.yes
       ? true
-      : await this.ctx.ui.confirm("Pull pi settings?", diffOutput);
+      : await this.ctx.ui.confirm(
+          "Pull pi settings?",
+          withDiffSummary(diffOutput),
+        );
 
     if (!confirmed) {
       setSyncFooter(this.ctx, local, remote, state);
@@ -265,7 +269,10 @@ export class SyncOperations {
 
     const confirmed = this.options.yes
       ? true
-      : await this.ctx.ui.confirm("Check out pi settings locally?", diffOutput);
+      : await this.ctx.ui.confirm(
+          "Check out pi settings locally?",
+          withDiffSummary(diffOutput),
+        );
 
     if (!confirmed) {
       await refreshSyncFooter(this.ctx);
@@ -425,4 +432,17 @@ function formatPushSummary(
     remote != null ? `Remote latest: ${remote.id}` : "Remote latest: empty",
     "Possible secrets were scanned before this prompt.",
   ].join("\n");
+}
+
+/**
+ * Prepend a compact `N files: +A -R` summary with a per-file breakdown to a
+ * diff body, for plain-text confirmation dialogs. Falls back to the raw diff
+ * when there is nothing to summarize.
+ *
+ * @param diffOutput Raw unified diff text.
+ */
+function withDiffSummary(diffOutput: string): string {
+  const summary = formatDiffSummary(diffOutput);
+
+  return summary === "" ? diffOutput : `${summary}\n\n${diffOutput}`;
 }

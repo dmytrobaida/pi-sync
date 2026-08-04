@@ -28,6 +28,7 @@ import {
   hasLocalChanges,
   remoteChangedSinceState,
 } from "../state/state.js";
+import { showDiffViewer } from "../ui/diff-viewer.js";
 import { errorMessage } from "../utils/json-utils.js";
 import { localConfigPath, repoDir, stateDir } from "../utils/path-utils.js";
 import { isEnabled, parseOptions, splitArgs, usage } from "./args.js";
@@ -229,7 +230,7 @@ async function diff(ctx: ExtensionCommandContext): Promise<void> {
   const output = await formatGitTextDiff(local, remote);
 
   ctx.ui.setStatus(ACTIVITY_STATUS_KEY, undefined);
-  ctx.ui.notify(output, output === NO_DIFF_MESSAGE ? "info" : "warning");
+  await showDiffViewer(output, "pisync diff: remote → local", ctx, NO_DIFF_MESSAGE);
 }
 
 async function doctor(ctx: ExtensionCommandContext): Promise<void> {

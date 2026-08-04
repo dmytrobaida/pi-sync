@@ -46,13 +46,18 @@
     "format:check": "prettier . --check"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*"
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "dependencies": {
+    "diff": "^8.0.4"
   },
   "devDependencies": {
     "@dbaida/eslint-config": "1.0.0",
-    "@earendil-works/pi-coding-agent": "^0.74.0",
+    "@earendil-works/pi-coding-agent": "^0.83.0",
+    "@earendil-works/pi-tui": "^0.83.0",
     "eslint": "^10.5.0",
-    "prettier": "^3.8.4",
+    "prettier": "3.8.4",
     "typescript": "^6.0.3"
   }
 }
