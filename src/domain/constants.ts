@@ -7,20 +7,36 @@ export const DEFAULT_BRANCH = "main";
 export const LOCK_STALE_MS = 30 * 60 * 1000;
 export const NO_DIFF_MESSAGE = "No file differences.";
 
-export const TOP_LEVEL_FILES = new Set([
+/**
+ * Paths pi-sync manages when pi-sync.json lists nothing. The fork keeps
+ * upstream's set as the default and lets the config add to it, so an existing
+ * install behaves the same until `include` is set.
+ *
+ * settings.json IS synced, as upstream has it, which means defaultProvider,
+ * defaultModel and enabledModels travel between machines. Take it out through
+ * `exclude` on a machine that needs its own choices.
+ */
+export const DEFAULT_INCLUDE = [
   "settings.json",
   "keybindings.json",
   "models.json",
   "AGENTS.md",
   "plannotator.json",
-]);
+  "skills/**",
+  "prompts/**",
+  "themes/**",
+  "extensions/**",
+];
 
-export const TOP_LEVEL_DIRS = new Set([
-  "skills",
-  "prompts",
-  "themes",
-  "extensions",
-]);
+/**
+ * Extra excludes applied on top of the built-in deny rules. The deny rules
+ * already cover node_modules, .git, .pisync, dotenv files and secrets by name.
+ */
+export const DEFAULT_EXCLUDE = [
+  "**/.DS_Store",
+  "**/*.tmp",
+  "**/*.log",
+];
 
 export const EXTERNAL_FILES = new Set([".plannotator/config.json"]);
 

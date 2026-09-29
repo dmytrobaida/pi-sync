@@ -5,7 +5,7 @@ import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 
 import { DEFAULT_BRANCH } from "../domain/constants.js";
 import type { PartialConfig } from "../domain/types.js";
-import { writeJson } from "../utils/json-utils.js";
+import { readJsonIfExists, writeJson } from "../utils/json-utils.js";
 import { localConfigPath } from "../utils/path-utils.js";
 import {
   githubCliStatus,
@@ -38,8 +38,14 @@ export async function initConfig(ctx: ExtensionCommandContext): Promise<void> {
   }
 
   const config = await promptConfig(ctx);
+  // The interactive flow only knows repository/branch/autoSync. Keep any
+  // include/exclude lists already in the file, or a re-run silently drops them
+  // and the extra paths stop syncing.
+  const existing = configExists
+    ? await readJsonIfExists<PartialConfig>(configPath)
+    : undefined;
 
-  await writeJson(configPath, config);
+  await writeJson(configPath, { ...existing, ...config });
   await maybeSetupGithubAuth(ctx, config.repository);
   ctx.ui.notify(
     `Created ${configPath}. Run /pisync doctor to verify repository access.`,

@@ -6,10 +6,14 @@ import path from "node:path";
 import {
   EXTERNAL_FILES,
   SECRET_PATTERNS,
-  TOP_LEVEL_DIRS,
-  TOP_LEVEL_FILES,
   VERSION,
 } from "../domain/constants.js";
+import {
+  isExcludedByManifest,
+  resolveManifest,
+  shouldDescend,
+  type SyncManifest,
+} from "../config/manifest.js";
 import type { Snapshot, SnapshotFile } from "../domain/types.js";
 import {
   agentDir,
@@ -148,16 +152,31 @@ export function fileHashMap(snapshot: Snapshot): Record<string, string> {
 
 async function collectFiles(root: string): Promise<SnapshotFile[]> {
   const results: SnapshotFile[] = [];
+  const manifest = resolveManifest();
 
   for (const entry of await fs.readdir(root, { withFileTypes: true })) {
-    if (entry.isFile() && TOP_LEVEL_FILES.has(entry.name)) {
+    if (isExcludedByManifest(entry.name, manifest)) {
+      continue;
+    }
+
+    if (entry.isFile() && isIncluded(entry.name, manifest)) {
       await addFile(results, root, entry.name);
-    } else if (entry.isDirectory() && TOP_LEVEL_DIRS.has(entry.name)) {
+    } else if (entry.isDirectory() && shouldDescend(entry.name, manifest)) {
       await collectDirectory(results, root, entry.name);
     }
   }
 
   return results.sort((left, right) => left.path.localeCompare(right.path));
+}
+
+/**
+ * Check whether a path is in the manifest, using the include patterns only.
+ *
+ * @param syncPath Path relative to the agent directory.
+ * @param manifest Resolved manifest.
+ */
+function isIncluded(syncPath: string, manifest: SyncManifest): boolean {
+  return manifest.includeMatchers.some((pattern) => pattern.test(syncPath));
 }
 
 async function collectDirectory(
@@ -167,18 +186,22 @@ async function collectDirectory(
 ): Promise<void> {
   const absoluteDirectory = path.join(root, relativeDirectory);
 
+  const manifest = resolveManifest();
+
   for (const entry of await fs.readdir(absoluteDirectory, {
     withFileTypes: true,
   })) {
     const relativePath = posixJoin(relativeDirectory, entry.name);
 
-    if (isDeniedPath(relativePath)) {
+    if (isDeniedPath(relativePath) || isExcludedByManifest(relativePath, manifest)) {
       continue;
     }
 
     if (entry.isDirectory()) {
-      await collectDirectory(results, root, relativePath);
-    } else if (entry.isFile()) {
+      if (shouldDescend(relativePath, manifest)) {
+        await collectDirectory(results, root, relativePath);
+      }
+    } else if (entry.isFile() && isIncluded(relativePath, manifest)) {
       await addFile(results, root, relativePath);
     }
   }
@@ -189,7 +212,10 @@ async function addFile(
   root: string,
   relativePath: string,
 ): Promise<void> {
-  if (isDeniedPath(relativePath)) {
+  if (
+    isDeniedPath(relativePath) ||
+    isExcludedByManifest(relativePath)
+  ) {
     return;
   }
 
@@ -225,7 +251,7 @@ async function addAbsoluteFile(
   filePath: string,
   syncPath: string,
 ): Promise<void> {
-  if (isDeniedPath(syncPath)) {
+  if (isDeniedPath(syncPath) || isExcludedByManifest(syncPath)) {
     return;
   }
 

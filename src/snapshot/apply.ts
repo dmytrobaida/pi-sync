@@ -1,11 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import {
-  EXTERNAL_FILES,
-  TOP_LEVEL_DIRS,
-  TOP_LEVEL_FILES,
-} from "../domain/constants.js";
+import { isExcludedByManifest, isInManifest } from "../config/manifest.js";
 import type { Snapshot } from "../domain/types.js";
 import {
   agentDir,
@@ -116,9 +112,23 @@ function staleLocalPaths(
   remotePaths: Set<string>,
 ): string[] {
   const deletePaths = new Set<string>();
+  // A path whose top-level entry the remote snapshot does not manage at all is
+  // not "removed", it is simply outside the synced set. Deleting it would make
+  // dropping a path from `include` destroy the local file on the next pull,
+  // which is how a working settings.json becomes an unconfigured one.
+  const remoteRoots = new Set(
+    [...remotePaths].map((remotePath) => remotePath.split("/")[0] ?? ""),
+  );
 
   for (const file of current.files) {
     const normalized = toPosix(file.path);
+
+    if (
+      !remoteRoots.has(normalized.split("/")[0] ?? "") ||
+      isExcludedByManifest(normalized)
+    ) {
+      continue;
+    }
 
     if (!remotePaths.has(normalized)) {
       deletePaths.add(syncPathToLocalPath(root, normalized));
@@ -245,13 +255,7 @@ function syncPathToLocalPath(root: string, syncPath: string): string {
 }
 
 function isManagedSyncPath(syncPath: string): boolean {
-  const firstSegment = syncPath.split("/")[0] ?? "";
-
-  return (
-    TOP_LEVEL_FILES.has(syncPath) ||
-    TOP_LEVEL_DIRS.has(firstSegment) ||
-    EXTERNAL_FILES.has(syncPath)
-  );
+  return isInManifest(syncPath);
 }
 
 function managedRootForPath(target: string): string {
